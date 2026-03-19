@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { signIn, useSession } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -20,6 +20,8 @@ type FormData = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("invite");
   const [error, setError] = useState("");
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
@@ -36,10 +38,25 @@ export default function LoginPage() {
 
     if (res?.error) {
       setError("Invalid email or password");
-    } else {
-      router.push("/dashboard");
-      router.refresh();
+      return;
     }
+
+    // If came from an invite link, accept the invite after login
+    if (inviteToken) {
+      // Get current user id from session
+      const sessionRes = await fetch("/api/auth/session");
+      const session = await sessionRes.json();
+      if (session?.user?.id) {
+        await fetch("/api/invite/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: inviteToken, userId: session.user.id }),
+        });
+      }
+    }
+
+    router.push("/dashboard");
+    router.refresh();
   };
 
   return (
@@ -49,25 +66,17 @@ export default function LoginPage() {
           <TrendingUp className="h-6 w-6 text-white" />
         </div>
         <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
-        <p className="text-sm text-gray-500 mt-1">Sign in to your FinTrack account</p>
+        <p className="text-sm text-gray-500 mt-1">
+          {inviteToken ? "Sign in to accept your household invite" : "Sign in to your FinTrack account"}
+        </p>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <Input
-            label="Email"
-            type="email"
-            placeholder="you@example.com"
-            {...register("email")}
-            error={errors.email?.message}
-          />
-          <Input
-            label="Password"
-            type="password"
-            placeholder="••••••••"
-            {...register("password")}
-            error={errors.password?.message}
-          />
+          <Input label="Email" type="email" placeholder="you@example.com"
+            {...register("email")} error={errors.email?.message} />
+          <Input label="Password" type="password" placeholder="••••••••"
+            {...register("password")} error={errors.password?.message} />
 
           {error && (
             <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">
@@ -76,14 +85,17 @@ export default function LoginPage() {
           )}
 
           <Button type="submit" className="w-full" loading={isSubmitting}>
-            Sign in
+            {inviteToken ? "Sign in & Join Household" : "Sign in"}
           </Button>
         </form>
       </div>
 
       <p className="text-center text-sm text-gray-500 mt-4">
         Don&apos;t have an account?{" "}
-        <Link href="/register" className="text-indigo-600 hover:underline font-medium">
+        <Link
+          href={inviteToken ? `/register?invite=${inviteToken}` : "/register"}
+          className="text-indigo-600 hover:underline font-medium"
+        >
           Create one
         </Link>
       </p>

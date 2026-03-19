@@ -56,7 +56,7 @@ model HouseholdMember {
 model Account {
   id          String      @id @default(cuid())
   householdId String
-  userId      String
+  userId      String?
   name        String
   type        AccountType @default(CHECKING)
   balance     Float       @default(0)
@@ -64,7 +64,7 @@ model Account {
   createdAt   DateTime    @default(now())
 
   household    Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  user         User          @relation(fields: [userId], references: [id])
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   transactions Transaction[]
 }
 
@@ -87,7 +87,7 @@ model Category {
 model Transaction {
   id          String          @id @default(cuid())
   householdId String
-  userId      String
+  userId      String?
   categoryId  String
   accountId   String?
   amount      Float
@@ -98,16 +98,16 @@ model Transaction {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id])
-  category  Category  @relation(fields: [categoryId], references: [id])
-  account   Account?  @relation(fields: [accountId], references: [id])
+  household Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  category  Category   @relation(fields: [categoryId], references: [id])
+  account   Account?   @relation(fields: [accountId], references: [id])
 }
 
 model RecurringTransaction {
   id          String          @id @default(cuid())
   householdId String
-  userId      String
+  userId      String?
   categoryId  String
   amount      Float
   type        TransactionType
@@ -119,9 +119,9 @@ model RecurringTransaction {
   isActive    Boolean         @default(true)
   createdAt   DateTime        @default(now())
 
-  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id])
-  category  Category  @relation(fields: [categoryId], references: [id])
+  household Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  category  Category   @relation(fields: [categoryId], references: [id])
 }
 
 model Budget {
