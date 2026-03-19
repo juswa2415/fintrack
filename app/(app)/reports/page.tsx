@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
+import { useCurrency } from "@/lib/use-currency";
 import { Download, FileText, BarChart3 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -26,20 +27,13 @@ interface ReportData {
 }
 
 export default function ReportsPage() {
+  const currency = useCurrency();
   const today = new Date();
   const [from, setFrom] = useState(new Date(today.getFullYear(), 0, 1).toISOString().split("T")[0]);
   const [to, setTo] = useState(today.toISOString().split("T")[0]);
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
   const [pdfReady, setPdfReady] = useState(false);
-  const [currency, setCurrency] = useState("USD");
-
-  useEffect(() => {
-    fetch("/api/household")
-      .then((r) => r.json())
-      .then((json) => { if (json.household?.currency) setCurrency(json.household.currency); })
-      .catch(() => {});
-  }, []);
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
@@ -60,7 +54,7 @@ export default function ReportsPage() {
         t.category.name,
         t.description ?? "",
         t.amount.toFixed(2),
-        t.user.name,
+        t.user?.name ?? "Deleted User",
       ]),
     ];
     const csv = rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
@@ -72,6 +66,8 @@ export default function ReportsPage() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const fmt = (v: unknown) => formatCurrency(Number(v), currency);
 
   return (
     <div className="space-y-6">
@@ -86,14 +82,12 @@ export default function ReportsPage() {
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">From</label>
               <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-                className="h-9 rounded-lg border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+                className="h-9 rounded-lg border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">To</label>
               <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-                className="h-9 rounded-lg border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+                className="h-9 rounded-lg border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
             <Button onClick={fetchReport} loading={loading}>
               <BarChart3 className="h-4 w-4 mr-1.5" /> Generate Report
@@ -144,7 +138,7 @@ export default function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(v) => formatCurrency(Number(v), currency)} />
+                    <Tooltip formatter={fmt} />
                     <Legend />
                     <Bar dataKey="income" fill="#22c55e" name="Income" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="expense" fill="#ef4444" name="Expenses" radius={[4, 4, 0, 0]} />
@@ -169,7 +163,7 @@ export default function ReportsPage() {
                           <Cell key={i} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(v) => formatCurrency(Number(v), currency)} />
+                      <Tooltip formatter={fmt} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
