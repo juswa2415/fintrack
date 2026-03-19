@@ -15,7 +15,7 @@ interface Category { id: string; name: string; type: string; color: string; icon
 const schema = z.object({
   name: z.string().min(1),
   type: z.enum(["INCOME", "EXPENSE"]),
-  color: z.string().default("#6366f1"),
+  color: z.string().min(1),
 });
 type FormData = z.infer<typeof schema>;
 

@@ -16,7 +16,7 @@ const schema = z.object({
   email: z.string().email("Invalid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   householdName: z.string().min(2, "Household name must be at least 2 characters"),
-  currency: z.string().default("USD"),
+  currency: z.string().min(1),
 });
 
 type FormData = z.infer<typeof schema>;
