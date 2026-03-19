@@ -1,17 +1,15 @@
 "use client";
 
-import { useCurrency } from "@/lib/use-currency";
 import { useState, useCallback } from "react";
+import { useCurrency } from "@/lib/use-currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { Download, FileText, BarChart3 } from "lucide-react";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  BarChart, Bar, ResponsiveContainer, PieChart, Pie, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
-
-const currency = useCurrency();
 
 interface ReportData {
   totalIncome: number;
@@ -23,6 +21,7 @@ interface ReportData {
 }
 
 export default function ReportsPage() {
+  const currency = useCurrency();
   const today = new Date();
   const [from, setFrom] = useState(new Date(today.getFullYear(), 0, 1).toISOString().split("T")[0]);
   const [to, setTo] = useState(today.toISOString().split("T")[0]);
@@ -39,14 +38,13 @@ export default function ReportsPage() {
   const exportCSV = () => {
     if (!data) return;
     const rows = [
-      ["Date", "Type", "Category", "Description", "Amount", "Member"],
+      ["Date", "Type", "Category", "Description", "Amount"],
       ...data.transactions.map((t: any) => [
         new Date(t.date).toLocaleDateString(),
         t.type,
         t.category.name,
         t.description ?? "",
         t.amount.toFixed(2),
-        
       ]),
     ];
     const csv = rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
@@ -59,13 +57,13 @@ export default function ReportsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const fmt = (v: unknown) => formatCurrency(Number(v), currency);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-          <p className="text-sm text-gray-500 mt-1">Analyze your financial data</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+        <p className="text-sm text-gray-500 mt-1">Analyze your financial data</p>
       </div>
 
       <Card>
@@ -74,14 +72,12 @@ export default function ReportsPage() {
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">From</label>
               <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-                className="h-9 rounded-lg border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+                className="h-9 rounded-lg border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">To</label>
               <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-                className="h-9 rounded-lg border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+                className="h-9 rounded-lg border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
             <Button onClick={fetchReport} loading={loading}>
               <BarChart3 className="h-4 w-4 mr-1.5" /> Generate Report
@@ -101,20 +97,20 @@ export default function ReportsPage() {
             <Card>
               <CardContent className="py-5 text-center">
                 <p className="text-xs text-gray-500 font-medium uppercase">Total Income</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">{formatCurrency(data.totalIncome)}</p>
+                <p className="text-2xl font-bold text-green-600 mt-1">{formatCurrency(data.totalIncome, currency)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="py-5 text-center">
                 <p className="text-xs text-gray-500 font-medium uppercase">Total Expenses</p>
-                <p className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(data.totalExpense)}</p>
+                <p className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(data.totalExpense, currency)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="py-5 text-center">
                 <p className="text-xs text-gray-500 font-medium uppercase">Net Savings</p>
                 <p className={`text-2xl font-bold mt-1 ${data.netSavings >= 0 ? "text-indigo-600" : "text-red-600"}`}>
-                  {formatCurrency(data.netSavings)}
+                  {formatCurrency(data.netSavings, currency)}
                 </p>
               </CardContent>
             </Card>
@@ -129,7 +125,7 @@ export default function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(v) => formatCurrency(Number(v), currency)} />
+                    <Tooltip formatter={fmt} />
                     <Legend />
                     <Bar dataKey="income" fill="#22c55e" name="Income" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="expense" fill="#ef4444" name="Expenses" radius={[4, 4, 0, 0]} />
@@ -146,16 +142,13 @@ export default function ReportsPage() {
                 ) : (
                   <ResponsiveContainer width="100%" height={240}>
                     <PieChart>
-                      <Pie
-                        data={data.byCategory.filter((c) => c.type === "EXPENSE")}
-                        cx="50%" cy="50%" outerRadius={90} dataKey="total"
-                        nameKey="name"
-                      >
+                      <Pie data={data.byCategory.filter((c) => c.type === "EXPENSE")}
+                        cx="50%" cy="50%" outerRadius={90} dataKey="total" nameKey="name">
                         {data.byCategory.filter((c) => c.type === "EXPENSE").map((entry, i) => (
                           <Cell key={i} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(v) => formatCurrency(Number(v), currency)} />
+                      <Tooltip formatter={fmt} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -193,7 +186,7 @@ export default function ReportsPage() {
                         }`}>{c.type}</span>
                       </td>
                       <td className={`px-6 py-3 text-right font-semibold ${c.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
-                        {formatCurrency(c.total)}
+                        {formatCurrency(c.total, currency)}
                       </td>
                     </tr>
                   ))}
