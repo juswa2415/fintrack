@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useCurrency } from "@/lib/use-currency";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, PlayCircle, Trash2 } from "lucide-react";
+import { Plus, PlayCircle, Trash2, Pencil } from "lucide-react";
 
 interface Category { id: string; name: string; type: string; color: string; }
 interface Recurring {
@@ -41,6 +41,7 @@ export default function RecurringPage() {
   const [items, setItems] = useState<Recurring[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editItem, setEditItem] = useState<Recurring | null>(null);
   const [loading, setLoading] = useState(true);
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
@@ -58,12 +59,39 @@ export default function RecurringPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const onSubmit = async (data: FormData) => {
-    await fetch("/api/recurring", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+  const openAdd = () => {
+    setEditItem(null);
+    reset({ type: "EXPENSE", frequency: "MONTHLY", startDate: new Date().toISOString().split("T")[0] });
+    setModalOpen(true);
+  };
+
+  const openEdit = (item: Recurring) => {
+    setEditItem(item);
+    reset({
+      categoryId: item.category.id,
+      amount: item.amount,
+      type: item.type as "INCOME" | "EXPENSE",
+      frequency: item.frequency as FormData["frequency"],
+      startDate: new Date(item.startDate).toISOString().split("T")[0],
+      description: item.description ?? "",
     });
+    setModalOpen(true);
+  };
+
+  const onSubmit = async (data: FormData) => {
+    if (editItem) {
+      await fetch(`/api/recurring/${editItem.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+    } else {
+      await fetch("/api/recurring", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+    }
     setModalOpen(false);
     reset();
     fetchData();
@@ -89,7 +117,7 @@ export default function RecurringPage() {
           <h1 className="text-2xl font-bold text-gray-900">Recurring Transactions</h1>
           <p className="text-sm text-gray-500 mt-1">Manage automatic income and expenses</p>
         </div>
-        <Button onClick={() => { reset(); setModalOpen(true); }}>
+        <Button onClick={openAdd}>
           <Plus className="h-4 w-4 mr-1.5" /> Add Recurring
         </Button>
       </div>
@@ -128,10 +156,21 @@ export default function RecurringPage() {
                   <span className={`text-lg font-bold ${item.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
                     {item.type === "INCOME" ? "+" : "-"}{formatCurrency(item.amount, currency)}
                   </span>
-                  <Button size="sm" variant="secondary" onClick={() => logNow(item.id)} title="Log now">
+                  <Button size="sm" variant="secondary" onClick={() => logNow(item.id)}>
                     <PlayCircle className="h-4 w-4 mr-1" /> Log Now
                   </Button>
-                  <button onClick={() => deleteItem(item.id)} className="p-1.5 rounded text-gray-400 hover:text-red-600 transition-colors">
+                  <button
+                    onClick={() => openEdit(item)}
+                    className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                    title="Edit"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => deleteItem(item.id)}
+                    className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    title="Deactivate"
+                  >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -141,7 +180,11 @@ export default function RecurringPage() {
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add Recurring Transaction">
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editItem ? "Edit Recurring Transaction" : "Add Recurring Transaction"}
+      >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="flex gap-2">
             {(["INCOME", "EXPENSE"] as const).map((t) => (
@@ -149,7 +192,7 @@ export default function RecurringPage() {
                 className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
                   selectedType === t
                     ? t === "INCOME" ? "bg-green-600 text-white border-green-600" : "bg-red-600 text-white border-red-600"
-                    : "bg-white text-gray-600 border-gray-300"
+                    : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
                 }`}
               >
                 {t === "INCOME" ? "Income" : "Expense"}
@@ -180,7 +223,9 @@ export default function RecurringPage() {
 
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button type="submit" className="flex-1" loading={isSubmitting}>Add Recurring</Button>
+            <Button type="submit" className="flex-1" loading={isSubmitting}>
+              {editItem ? "Save Changes" : "Add Recurring"}
+            </Button>
           </div>
         </form>
       </Modal>

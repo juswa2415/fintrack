@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireHousehold } from "@/lib/session";
+
+const patchSchema = z.object({
+  categoryId: z.string().optional(),
+  amount: z.number().positive().optional(),
+  type: z.enum(["INCOME", "EXPENSE"]).optional(),
+  frequency: z.enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  description: z.string().optional(),
+});
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -45,6 +56,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const household = await requireHousehold(session.user.id);
     const { id } = await params;
     const body = await req.json();
+    const data = patchSchema.parse(body);
 
     const recurring = await prisma.recurringTransaction.findFirst({
       where: { id, householdId: household.id },
@@ -53,12 +65,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const updated = await prisma.recurringTransaction.update({
       where: { id },
-      data: body,
+      data: {
+        ...data,
+        startDate: data.startDate ? new Date(data.startDate) : undefined,
+        endDate: data.endDate ? new Date(data.endDate) : undefined,
+      },
       include: { category: true, user: { select: { id: true, name: true } } },
     });
 
     return NextResponse.json(updated);
   } catch (err: any) {
+    if (err.name === "ZodError") {
+      return NextResponse.json({ error: err.errors[0].message }, { status: 400 });
+    }
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

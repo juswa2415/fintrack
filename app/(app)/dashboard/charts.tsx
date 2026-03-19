@@ -15,6 +15,8 @@ interface Props {
 }
 
 export function DashboardCharts({ sixMonthsData, pieData, budgetData, currency }: Props) {
+  const fmt = (v: unknown) => formatCurrency(Number(v), currency);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <Card className="lg:col-span-2">
@@ -27,7 +29,7 @@ export function DashboardCharts({ sixMonthsData, pieData, budgetData, currency }
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip formatter={(v: number) => formatCurrency(v, currency)} />
+              <Tooltip formatter={fmt} />
               <Legend />
               <Line type="monotone" dataKey="income" stroke="#22c55e" strokeWidth={2} dot={false} name="Income" />
               <Line type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={2} dot={false} name="Expenses" />
@@ -51,7 +53,7 @@ export function DashboardCharts({ sixMonthsData, pieData, budgetData, currency }
                     <Cell key={i} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => formatCurrency(v, currency)} />
+                <Tooltip formatter={fmt} />
               </PieChart>
             </ResponsiveContainer>
           )}
@@ -80,7 +82,7 @@ export function DashboardCharts({ sixMonthsData, pieData, budgetData, currency }
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={110} />
-                <Tooltip formatter={(v: number) => formatCurrency(v, currency)} />
+                <Tooltip formatter={fmt} />
                 <Legend />
                 <Bar dataKey="budget" fill="#c7d2fe" name="Budget" radius={[0, 4, 4, 0]} />
                 <Bar dataKey="spent" fill="#6366f1" name="Spent" radius={[0, 4, 4, 0]} />
