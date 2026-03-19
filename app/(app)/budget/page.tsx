@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { useCurrency } from "@/lib/use-currency";
 import { formatCurrency, getCurrentMonthYear, getMonthName } from "@/lib/utils";
 import { Plus, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 
@@ -22,6 +23,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function BudgetPage() {
+  const currency = useCurrency();
   const { month: curMonth, year: curYear } = getCurrentMonthYear();
   const [month, setMonth] = useState(curMonth);
   const [year, setYear] = useState(curYear);
@@ -131,7 +133,7 @@ export default function BudgetPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-gray-500">
-                        {formatCurrency(spent)} / {formatCurrency(b.amount)}
+                        {formatCurrency(spent, currency)} / {formatCurrency(b.amount, currency)}
                       </span>
                       <button onClick={() => deleteBudget(b.id)} className="p-1 rounded text-gray-400 hover:text-red-600 transition-colors">
                         <Trash2 className="h-3.5 w-3.5" />

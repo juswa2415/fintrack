@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { useCurrency } from "@/lib/use-currency";
 import { formatCurrency } from "@/lib/utils";
 import { Plus, PlayCircle, Trash2 } from "lucide-react";
 
@@ -36,6 +37,7 @@ const FREQUENCIES = [
 ];
 
 export default function RecurringPage() {
+  const currency = useCurrency();
   const [items, setItems] = useState<Recurring[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -124,7 +126,7 @@ export default function RecurringPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className={`text-lg font-bold ${item.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
-                    {item.type === "INCOME" ? "+" : "-"}{formatCurrency(item.amount)}
+                    {item.type === "INCOME" ? "+" : "-"}{formatCurrency(item.amount, currency)}
                   </span>
                   <Button size="sm" variant="secondary" onClick={() => logNow(item.id)} title="Log now">
                     <PlayCircle className="h-4 w-4 mr-1" /> Log Now

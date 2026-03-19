@@ -1,14 +1,20 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { Download, FileText, BarChart3 } from "lucide-react";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  BarChart, Bar, ResponsiveContainer, PieChart, Pie, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
+import dynamic from "next/dynamic";
+
+const PDFExportButton = dynamic(
+  () => import("@/components/reports/pdf-button").then((mod) => mod.PDFExportButton),
+  { ssr: false, loading: () => <Button variant="outline" disabled><FileText className="h-4 w-4 mr-1.5" />Preparing PDF...</Button> }
+);
 
 interface ReportData {
   totalIncome: number;
@@ -25,12 +31,23 @@ export default function ReportsPage() {
   const [to, setTo] = useState(today.toISOString().split("T")[0]);
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pdfReady, setPdfReady] = useState(false);
+  const [currency, setCurrency] = useState("USD");
+
+  useEffect(() => {
+    fetch("/api/household")
+      .then((r) => r.json())
+      .then((json) => { if (json.household?.currency) setCurrency(json.household.currency); })
+      .catch(() => {});
+  }, []);
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
+    setPdfReady(false);
     const res = await fetch(`/api/reports?from=${from}&to=${to}`);
     setData(await res.json());
     setLoading(false);
+    setTimeout(() => setPdfReady(true), 300);
   }, [from, to]);
 
   const exportCSV = () => {
@@ -58,11 +75,9 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-          <p className="text-sm text-gray-500 mt-1">Analyze your financial data</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+        <p className="text-sm text-gray-500 mt-1">Analyze your financial data</p>
       </div>
 
       <Card>
@@ -88,6 +103,9 @@ export default function ReportsPage() {
                 <Download className="h-4 w-4 mr-1.5" /> Export CSV
               </Button>
             )}
+            {data && pdfReady && (
+              <PDFExportButton data={data} from={from} to={to} currency={currency} />
+            )}
           </div>
         </CardContent>
       </Card>
@@ -98,20 +116,20 @@ export default function ReportsPage() {
             <Card>
               <CardContent className="py-5 text-center">
                 <p className="text-xs text-gray-500 font-medium uppercase">Total Income</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">{formatCurrency(data.totalIncome)}</p>
+                <p className="text-2xl font-bold text-green-600 mt-1">{formatCurrency(data.totalIncome, currency)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="py-5 text-center">
                 <p className="text-xs text-gray-500 font-medium uppercase">Total Expenses</p>
-                <p className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(data.totalExpense)}</p>
+                <p className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(data.totalExpense, currency)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="py-5 text-center">
                 <p className="text-xs text-gray-500 font-medium uppercase">Net Savings</p>
                 <p className={`text-2xl font-bold mt-1 ${data.netSavings >= 0 ? "text-indigo-600" : "text-red-600"}`}>
-                  {formatCurrency(data.netSavings)}
+                  {formatCurrency(data.netSavings, currency)}
                 </p>
               </CardContent>
             </Card>
@@ -126,7 +144,7 @@ export default function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v), currency)} />
                     <Legend />
                     <Bar dataKey="income" fill="#22c55e" name="Income" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="expense" fill="#ef4444" name="Expenses" radius={[4, 4, 0, 0]} />
@@ -145,14 +163,13 @@ export default function ReportsPage() {
                     <PieChart>
                       <Pie
                         data={data.byCategory.filter((c) => c.type === "EXPENSE")}
-                        cx="50%" cy="50%" outerRadius={90} dataKey="total"
-                        nameKey="name"
+                        cx="50%" cy="50%" outerRadius={90} dataKey="total" nameKey="name"
                       >
                         {data.byCategory.filter((c) => c.type === "EXPENSE").map((entry, i) => (
                           <Cell key={i} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                      <Tooltip formatter={(v) => formatCurrency(Number(v), currency)} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -190,7 +207,7 @@ export default function ReportsPage() {
                         }`}>{c.type}</span>
                       </td>
                       <td className={`px-6 py-3 text-right font-semibold ${c.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
-                        {formatCurrency(c.total)}
+                        {formatCurrency(c.total, currency)}
                       </td>
                     </tr>
                   ))}

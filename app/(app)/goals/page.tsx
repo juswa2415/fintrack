@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { useCurrency } from "@/lib/use-currency";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Plus, Target, Trash2, CheckCircle2 } from "lucide-react";
 
@@ -33,6 +34,7 @@ type GoalData = z.infer<typeof goalSchema>;
 type ContributeData = z.infer<typeof contributeSchema>;
 
 export default function GoalsPage() {
+  const currency = useCurrency();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [addOpen, setAddOpen] = useState(false);
@@ -128,8 +130,8 @@ export default function GoalsPage() {
 
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">{formatCurrency(g.currentAmount)} saved</span>
-                      <span className="font-semibold text-gray-800">{formatCurrency(g.targetAmount)}</span>
+                      <span className="text-gray-500">{formatCurrency(g.currentAmount, currency)} saved</span>
+                      <span className="font-semibold text-gray-800">{formatCurrency(g.targetAmount, currency)}</span>
                     </div>
                     <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                       <div
@@ -139,7 +141,7 @@ export default function GoalsPage() {
                     </div>
                     <div className="flex justify-between text-xs text-gray-400">
                       <span>{pct.toFixed(0)}% complete</span>
-                      {!g.isCompleted && <span>{formatCurrency(remaining)} to go</span>}
+                      {!g.isCompleted && <span>{formatCurrency(remaining, currency)} to go</span>}
                     </div>
                   </div>
 

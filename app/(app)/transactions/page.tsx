@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { useCurrency } from "@/lib/use-currency";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Plus, Pencil, Trash2, Filter } from "lucide-react";
 
@@ -31,6 +32,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function TransactionsPage() {
+  const currency = useCurrency();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -167,7 +169,7 @@ export default function TransactionsPage() {
                       </td>
                       <td className="px-6 py-3 text-gray-500">{tx.user.name}</td>
                       <td className={`px-6 py-3 text-right font-semibold ${tx.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
-                        {tx.type === "INCOME" ? "+" : "-"}{formatCurrency(tx.amount)}
+                        {tx.type === "INCOME" ? "+" : "-"}{formatCurrency(tx.amount, currency)}
                       </td>
                       <td className="px-6 py-3">
                         <div className="flex items-center justify-end gap-1">
