@@ -10,7 +10,7 @@ const schema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   householdName: z.string().min(2),
-  currency: z.string().default("USD"),
+  currency: z.string().min(1),
 });
 
 export async function POST(req: NextRequest) {
@@ -51,3 +51,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
