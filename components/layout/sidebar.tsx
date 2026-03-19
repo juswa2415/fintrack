@@ -30,8 +30,7 @@ const navItems = [
 ];
 
 const settingsItems = [
-  { href: "/settings/household", label: "Household", icon: Settings },
-  { href: "/settings/categories", label: "Categories", icon: ChevronRight },
+  { href: "/settings/categories", label: "Categories", icon: Settings },
   { href: "/settings/profile", label: "Profile", icon: ChevronRight },
 ];
 
@@ -45,7 +44,6 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="flex flex-col h-full bg-gray-900 text-white">
-      {/* Logo */}
       <div className="flex items-center justify-between px-6 py-5 border-b border-gray-800">
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600">
@@ -53,7 +51,6 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
           </div>
           <span className="text-lg font-bold text-white">FinTrack</span>
         </div>
-        {/* Close button — only visible on mobile */}
         <button
           onClick={onClose}
           className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
@@ -62,7 +59,6 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         <p className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Main</p>
         {navItems.map(({ href, label, icon: Icon }) => (
@@ -101,7 +97,6 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
         ))}
       </nav>
 
-      {/* Sign out */}
       <div className="px-3 py-4 border-t border-gray-800">
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
@@ -116,39 +111,29 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
 }
 
 export function Sidebar({ open, onClose }: SidebarProps) {
-  // Close sidebar on route change (mobile)
   const pathname = usePathname();
   useEffect(() => { onClose(); }, [pathname]);
 
   return (
     <>
-      {/* Desktop sidebar — always visible on lg+ */}
       <aside className="hidden lg:flex lg:flex-col fixed left-0 top-0 h-full w-60 z-40">
         <SidebarContent onClose={onClose} />
       </aside>
 
-      {/* Mobile overlay */}
       {open && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />
       )}
 
-      {/* Mobile drawer */}
-      <aside
-        className={cn(
-          "fixed left-0 top-0 h-full w-72 z-50 lg:hidden transition-transform duration-300 ease-in-out",
-          open ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
+      <aside className={cn(
+        "fixed left-0 top-0 h-full w-72 z-50 lg:hidden transition-transform duration-300 ease-in-out",
+        open ? "translate-x-0" : "-translate-x-full"
+      )}>
         <SidebarContent onClose={onClose} />
       </aside>
     </>
   );
 }
 
-// Hamburger button — used in TopBar on mobile
 export function MenuButton({ onClick }: { onClick: () => void }) {
   return (
     <button

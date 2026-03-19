@@ -1,26 +1,27 @@
 export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requireHousehold } from "@/lib/session";
+import { requireAuth } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
     const { searchParams } = new URL(req.url);
 
-    const from = searchParams.get("from") ? new Date(searchParams.get("from")!) : new Date(new Date().getFullYear(), 0, 1);
-    const to = searchParams.get("to") ? new Date(searchParams.get("to")!) : new Date();
+    const from = searchParams.get("from")
+      ? new Date(searchParams.get("from")!)
+      : new Date(new Date().getFullYear(), 0, 1);
+    const to = searchParams.get("to")
+      ? new Date(searchParams.get("to")!)
+      : new Date();
 
     const transactions = await prisma.transaction.findMany({
       where: {
-        householdId: household.id,
+        userId: session.user.id,
         date: { gte: from, lte: to },
       },
-      include: {
-        category: true,
-        user: { select: { id: true, name: true } },
-      },
+      include: { category: true },
       orderBy: { date: "asc" },
     });
 

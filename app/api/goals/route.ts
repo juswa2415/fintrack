@@ -1,8 +1,9 @@
 export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requireHousehold } from "@/lib/session";
+import { requireAuth } from "@/lib/session";
 
 const schema = z.object({
   name: z.string().min(1),
@@ -14,10 +15,9 @@ const schema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
 
     const goals = await prisma.goal.findMany({
-      where: { householdId: household.id },
+      where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
     });
 
@@ -30,13 +30,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
     const body = await req.json();
     const data = schema.parse(body);
 
     const goal = await prisma.goal.create({
       data: {
-        householdId: household.id,
+        userId: session.user.id,
         name: data.name,
         description: data.description,
         targetAmount: data.targetAmount,

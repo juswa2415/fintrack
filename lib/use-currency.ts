@@ -6,10 +6,10 @@ export function useCurrency() {
   const [currency, setCurrency] = useState("USD");
 
   useEffect(() => {
-    fetch("/api/household")
+    fetch("/api/profile")
       .then((r) => r.json())
       .then((json) => {
-        if (json.household?.currency) setCurrency(json.household.currency);
+        if (json.currency) setCurrency(json.currency);
       })
       .catch(() => {});
   }, []);

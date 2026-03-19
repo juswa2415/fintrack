@@ -1,8 +1,9 @@
 export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requireHousehold } from "@/lib/session";
+import { requireAuth } from "@/lib/session";
 
 const patchSchema = z.object({
   categoryId: z.string().optional(),
@@ -17,18 +18,16 @@ const patchSchema = z.object({
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
     const { id } = await params;
 
     const recurring = await prisma.recurringTransaction.findFirst({
-      where: { id, householdId: household.id },
+      where: { id, userId: session.user.id },
     });
     if (!recurring) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const transaction = await prisma.$transaction(async (tx) => {
       const created = await tx.transaction.create({
         data: {
-          householdId: household.id,
           userId: session.user.id,
           categoryId: recurring.categoryId,
           amount: recurring.amount,
@@ -54,13 +53,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
     const { id } = await params;
     const body = await req.json();
     const data = patchSchema.parse(body);
 
     const recurring = await prisma.recurringTransaction.findFirst({
-      where: { id, householdId: household.id },
+      where: { id, userId: session.user.id },
     });
     if (!recurring) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -71,7 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         startDate: data.startDate ? new Date(data.startDate) : undefined,
         endDate: data.endDate ? new Date(data.endDate) : undefined,
       },
-      include: { category: true, user: { select: { id: true, name: true } } },
+      include: { category: true },
     });
 
     return NextResponse.json(updated);
@@ -86,15 +84,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
     const { id } = await params;
 
     const recurring = await prisma.recurringTransaction.findFirst({
-      where: { id, householdId: household.id },
+      where: { id, userId: session.user.id },
     });
     if (!recurring) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    await prisma.recurringTransaction.update({ where: { id }, data: { isActive: false } });
+    await prisma.recurringTransaction.update({
+      where: { id },
+      data: { isActive: false },
+    });
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

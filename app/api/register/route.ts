@@ -10,11 +10,7 @@ const schema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(6),
-  // Only required when NOT joining via invite
-  householdName: z.string().min(2).optional(),
-  currency: z.string().min(1).optional(),
-  // Present when joining via invite
-  inviteToken: z.string().optional(),
+  currency: z.string().min(1).default("USD"),
 });
 
 export async function POST(req: NextRequest) {
@@ -29,38 +25,18 @@ export async function POST(req: NextRequest) {
 
     const hashed = await bcrypt.hash(data.password, 12);
 
-    if (data.inviteToken) {
-      // Invite flow — create user only, no household
-      // The invite/accept endpoint handles adding them to the household
-      const user = await prisma.user.create({
-        data: { name: data.name, email: data.email, password: hashed },
-      });
-      return NextResponse.json({ success: true, userId: user.id }, { status: 201 });
-    }
-
-    // Normal flow — create user + household
-    if (!data.householdName || !data.currency) {
-      return NextResponse.json({ error: "Household name and currency are required" }, { status: 400 });
-    }
-
-    const result = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: { name: data.name, email: data.email, password: hashed },
-      });
-      const household = await tx.household.create({
-        data: {
-          name: data.householdName!,
-          currency: data.currency!,
-          members: {
-            create: { userId: user.id, role: "OWNER" },
-          },
-        },
-      });
-      await seedDefaultCategories(household.id, tx);
-      return { user, household };
+    const user = await prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        password: hashed,
+        currency: data.currency,
+      },
     });
 
-    return NextResponse.json({ success: true, userId: result.user.id }, { status: 201 });
+    await seedDefaultCategories(user.id, prisma);
+
+    return NextResponse.json({ success: true, userId: user.id }, { status: 201 });
   } catch (err: any) {
     if (err.name === "ZodError") {
       return NextResponse.json({ error: err.errors[0].message }, { status: 400 });

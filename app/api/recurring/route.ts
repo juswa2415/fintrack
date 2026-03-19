@@ -1,8 +1,9 @@
 export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requireHousehold } from "@/lib/session";
+import { requireAuth } from "@/lib/session";
 
 const schema = z.object({
   categoryId: z.string(),
@@ -17,11 +18,10 @@ const schema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
 
     const recurring = await prisma.recurringTransaction.findMany({
-      where: { householdId: household.id, isActive: true },
-      include: { category: true, user: { select: { id: true, name: true } } },
+      where: { userId: session.user.id, isActive: true },
+      include: { category: true },
       orderBy: { createdAt: "desc" },
     });
 
@@ -34,13 +34,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
     const body = await req.json();
     const data = schema.parse(body);
 
     const recurring = await prisma.recurringTransaction.create({
       data: {
-        householdId: household.id,
         userId: session.user.id,
         categoryId: data.categoryId,
         amount: data.amount,
@@ -50,7 +48,7 @@ export async function POST(req: NextRequest) {
         endDate: data.endDate ? new Date(data.endDate) : undefined,
         description: data.description,
       },
-      include: { category: true, user: { select: { id: true, name: true } } },
+      include: { category: true },
     });
 
     return NextResponse.json(recurring, { status: 201 });

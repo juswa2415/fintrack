@@ -1,12 +1,12 @@
 export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requireHousehold } from "@/lib/session";
+import { requireAuth } from "@/lib/session";
 
 const schema = z.object({
   categoryId: z.string(),
-  accountId: z.string().optional(),
   amount: z.number().positive(),
   type: z.enum(["INCOME", "EXPENSE"]),
   date: z.string(),
@@ -17,13 +17,11 @@ const schema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
     const { searchParams } = new URL(req.url);
 
-    const where: any = { householdId: household.id };
+    const where: any = { userId: session.user.id };
     if (searchParams.get("type")) where.type = searchParams.get("type");
     if (searchParams.get("categoryId")) where.categoryId = searchParams.get("categoryId");
-    if (searchParams.get("userId")) where.userId = searchParams.get("userId");
     if (searchParams.get("from") || searchParams.get("to")) {
       where.date = {};
       if (searchParams.get("from")) where.date.gte = new Date(searchParams.get("from")!);
@@ -32,7 +30,7 @@ export async function GET(req: NextRequest) {
 
     const transactions = await prisma.transaction.findMany({
       where,
-      include: { category: true, user: { select: { id: true, name: true } } },
+      include: { category: true },
       orderBy: { date: "desc" },
       take: searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : undefined,
     });
@@ -46,23 +44,20 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
     const body = await req.json();
     const data = schema.parse(body);
 
     const transaction = await prisma.transaction.create({
       data: {
-        householdId: household.id,
         userId: session.user.id,
         categoryId: data.categoryId,
-        accountId: data.accountId,
         amount: data.amount,
         type: data.type,
         date: new Date(data.date),
         description: data.description,
         notes: data.notes,
       },
-      include: { category: true, user: { select: { id: true, name: true } } },
+      include: { category: true },
     });
 
     return NextResponse.json(transaction, { status: 201 });

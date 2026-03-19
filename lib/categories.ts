@@ -25,16 +25,16 @@ export const DEFAULT_EXPENSE_CATEGORIES = [
   { name: "Other Expenses", icon: "more-horizontal", color: "#6b7280" },
 ];
 
-export async function seedDefaultCategories(householdId: string, prisma: any) {
+export async function seedDefaultCategories(userId: string, prisma: any) {
   const income = DEFAULT_INCOME_CATEGORIES.map((c) => ({
     ...c,
-    householdId,
+    userId,
     type: CategoryType.INCOME,
     isDefault: true,
   }));
   const expense = DEFAULT_EXPENSE_CATEGORIES.map((c) => ({
     ...c,
-    householdId,
+    userId,
     type: CategoryType.EXPENSE,
     isDefault: true,
   }));

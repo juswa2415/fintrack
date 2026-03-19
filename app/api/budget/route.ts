@@ -1,8 +1,9 @@
 export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requireHousehold } from "@/lib/session";
+import { requireAuth } from "@/lib/session";
 
 const schema = z.object({
   categoryId: z.string(),
@@ -14,10 +15,9 @@ const schema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
     const { searchParams } = new URL(req.url);
 
-    const where: any = { householdId: household.id };
+    const where: any = { userId: session.user.id };
     if (searchParams.get("month")) where.month = parseInt(searchParams.get("month")!);
     if (searchParams.get("year")) where.year = parseInt(searchParams.get("year")!);
 
@@ -35,14 +35,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
     const body = await req.json();
     const data = schema.parse(body);
 
     const budget = await prisma.budget.upsert({
       where: {
-        householdId_categoryId_month_year: {
-          householdId: household.id,
+        userId_categoryId_month_year: {
+          userId: session.user.id,
           categoryId: data.categoryId,
           month: data.month,
           year: data.year,
@@ -50,7 +49,7 @@ export async function POST(req: NextRequest) {
       },
       update: { amount: data.amount },
       create: {
-        householdId: household.id,
+        userId: session.user.id,
         categoryId: data.categoryId,
         amount: data.amount,
         month: data.month,

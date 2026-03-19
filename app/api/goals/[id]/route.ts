@@ -1,8 +1,9 @@
 export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requireHousehold } from "@/lib/session";
+import { requireAuth } from "@/lib/session";
 
 const contributeSchema = z.object({
   amount: z.number().positive(),
@@ -12,20 +13,21 @@ const contributeSchema = z.object({
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
     const { id } = await params;
     const body = await req.json();
 
-    const goal = await prisma.goal.findFirst({ where: { id, householdId: household.id } });
+    const goal = await prisma.goal.findFirst({
+      where: { id, userId: session.user.id },
+    });
     if (!goal) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     if (body.contribute) {
       const { amount, categoryId } = contributeSchema.parse(body);
       const newAmount = Math.min(goal.currentAmount + amount, goal.targetAmount);
+
       const updated = await prisma.$transaction(async (tx) => {
         await tx.transaction.create({
           data: {
-            householdId: household.id,
             userId: session.user.id,
             categoryId,
             amount,
@@ -63,10 +65,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await requireAuth();
-    const household = await requireHousehold(session.user.id);
     const { id } = await params;
 
-    const goal = await prisma.goal.findFirst({ where: { id, householdId: household.id } });
+    const goal = await prisma.goal.findFirst({
+      where: { id, userId: session.user.id },
+    });
     if (!goal) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     await prisma.goal.delete({ where: { id } });
