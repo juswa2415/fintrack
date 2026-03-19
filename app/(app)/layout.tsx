@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getUserHousehold } from "@/lib/session";
-import { Sidebar } from "@/components/layout/sidebar";
-import { TopBar } from "@/components/layout/topbar";
+import { AppShell } from "@/components/layout/app-shell";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -12,14 +11,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!household) redirect("/register");
 
   return (
-    <div className="flex h-full">
-      <Sidebar />
-      <div className="flex-1 flex flex-col ml-60 min-h-full">
-        <TopBar householdName={household.name} />
-        <main className="flex-1 p-6 overflow-auto">
-          {children}
-        </main>
-      </div>
-    </div>
+    <AppShell householdName={household.name} userName={session.user.name ?? ""}>
+      {children}
+    </AppShell>
   );
 }
