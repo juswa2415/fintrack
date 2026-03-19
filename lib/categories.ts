@@ -40,3 +40,4 @@ export async function seedDefaultCategories(userId: string, prisma: any) {
   }));
   await prisma.category.createMany({ data: [...income, ...expense] });
 }
+

@@ -15,7 +15,7 @@ interface Category { id: string; name: string; type: string; color: string; }
 interface Recurring {
   id: string; amount: number; type: string; frequency: string;
   description: string | null; category: Category;
-  user: { name: string }; lastLogged: string | null; startDate: string;
+  lastLogged: string | null; startDate: string;
 }
 
 const schema = z.object({
@@ -115,7 +115,7 @@ export default function RecurringPage() {
                   <div>
                     <p className="font-medium text-gray-900">{item.description || item.category.name}</p>
                     <p className="text-sm text-gray-500">
-                      {item.category.name} · {item.frequency.charAt(0) + item.frequency.slice(1).toLowerCase()} · {item.user?.name ?? "Deleted User"}
+                      {item.category.name} · {item.frequency.charAt(0) + item.frequency.slice(1).toLowerCase()}
                     </p>
                     {item.lastLogged && (
                       <p className="text-xs text-gray-400">Last logged: {new Date(item.lastLogged).toLocaleDateString()}</p>

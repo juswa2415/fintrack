@@ -17,7 +17,6 @@ interface Category {
 interface Transaction {
   id: string; amount: number; type: string; date: string;
   description: string | null; category: Category;
-  user: { name: string };
 }
 
 const schema = z.object({
@@ -149,7 +148,7 @@ export default function TransactionsPage() {
                     <th className="text-left px-6 py-3 font-medium text-gray-600">Date</th>
                     <th className="text-left px-6 py-3 font-medium text-gray-600">Description</th>
                     <th className="text-left px-6 py-3 font-medium text-gray-600">Category</th>
-                    <th className="text-left px-6 py-3 font-medium text-gray-600">Member</th>
+                    
                     <th className="text-right px-6 py-3 font-medium text-gray-600">Amount</th>
                     <th className="px-6 py-3" />
                   </tr>
@@ -165,7 +164,6 @@ export default function TransactionsPage() {
                           {tx.category.name}
                         </span>
                       </td>
-                      <td className="px-6 py-3 text-gray-500">{tx.user?.name ?? "Deleted User"}</td>
                       <td className={`px-6 py-3 text-right font-semibold ${tx.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
                         {tx.type === "INCOME" ? "+" : "-"}{formatCurrency(tx.amount)}
                       </td>
