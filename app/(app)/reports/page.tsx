@@ -1,5 +1,6 @@
 "use client";
 
+import { useCurrency } from "@/lib/use-currency";
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   BarChart, Bar, ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
+
+const currency = useCurrency();
 
 interface ReportData {
   totalIncome: number;
@@ -126,7 +129,7 @@ export default function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v), currency)} />
                     <Legend />
                     <Bar dataKey="income" fill="#22c55e" name="Income" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="expense" fill="#ef4444" name="Expenses" radius={[4, 4, 0, 0]} />
@@ -152,7 +155,7 @@ export default function ReportsPage() {
                           <Cell key={i} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                      <Tooltip formatter={(v) => formatCurrency(Number(v), currency)} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
