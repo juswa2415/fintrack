@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Users } from "lucide-react";
 
-// Schema for creating a NEW household (no invite)
 const newHouseholdSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email"),
@@ -20,7 +19,6 @@ const newHouseholdSchema = z.object({
   currency: z.string().min(1),
 });
 
-// Schema for joining via invite (no household fields needed)
 const joinSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email"),
@@ -40,7 +38,7 @@ const CURRENCIES = [
   { value: "AUD", label: "AUD — Australian Dollar" },
 ];
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get("invite");
@@ -48,7 +46,6 @@ export default function RegisterPage() {
   const [inviteInfo, setInviteInfo] = useState<{ householdName: string; senderName: string } | null>(null);
   const [inviteError, setInviteError] = useState("");
 
-  // Fetch invite info if token present
   useEffect(() => {
     if (!inviteToken) return;
     fetch(`/api/invite/info?token=${inviteToken}`)
@@ -60,13 +57,11 @@ export default function RegisterPage() {
       .catch(() => setInviteError("Could not load invite details"));
   }, [inviteToken]);
 
-  // New household form
   const newForm = useForm<NewHouseholdData>({
     resolver: zodResolver(newHouseholdSchema),
     defaultValues: { currency: "USD" },
   });
 
-  // Join via invite form
   const joinForm = useForm<JoinData>({
     resolver: zodResolver(joinSchema),
   });
@@ -80,15 +75,12 @@ export default function RegisterPage() {
     });
     const json = await res.json();
     if (!res.ok) { setError(json.error ?? "Registration failed"); return; }
-
     await signIn("credentials", { email: data.email, password: data.password, redirect: false });
     router.push("/dashboard");
   };
 
   const onSubmitJoin = async (data: JoinData) => {
     setError("");
-
-    // Step 1: Create account (no household)
     const res = await fetch("/api/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -97,7 +89,6 @@ export default function RegisterPage() {
     const json = await res.json();
     if (!res.ok) { setError(json.error ?? "Registration failed"); return; }
 
-    // Step 2: Sign in
     const signInRes = await signIn("credentials", {
       email: data.email,
       password: data.password,
@@ -105,21 +96,15 @@ export default function RegisterPage() {
     });
     if (signInRes?.error) { setError("Account created but sign-in failed. Please log in manually."); return; }
 
-    // Step 3: Accept invite
-    const acceptRes = await fetch("/api/invite/accept", {
+    await fetch("/api/invite/accept", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: inviteToken, userId: json.userId }),
     });
-    if (!acceptRes.ok) {
-      router.push("/dashboard"); // Still go to dashboard, invite acceptance is secondary
-      return;
-    }
 
     router.push("/dashboard");
   };
 
-  // Show invite error state
   if (inviteToken && inviteError) {
     return (
       <div className="w-full max-w-sm text-center">
@@ -134,7 +119,6 @@ export default function RegisterPage() {
     );
   }
 
-  // Invite flow — join existing household
   if (inviteToken) {
     return (
       <div className="w-full max-w-sm">
@@ -152,7 +136,6 @@ export default function RegisterPage() {
             <p className="text-sm text-gray-500 mt-1">Create an account to join the household</p>
           )}
         </div>
-
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <form onSubmit={joinForm.handleSubmit(onSubmitJoin)} className="space-y-4">
             <Input label="Your Name" placeholder="John Smith"
@@ -161,17 +144,12 @@ export default function RegisterPage() {
               {...joinForm.register("email")} error={joinForm.formState.errors.email?.message} />
             <Input label="Password" type="password" placeholder="••••••••"
               {...joinForm.register("password")} error={joinForm.formState.errors.password?.message} />
-
-            {error && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{error}</div>
-            )}
-
+            {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{error}</div>}
             <Button type="submit" className="w-full" loading={joinForm.formState.isSubmitting}>
               Create Account & Join
             </Button>
           </form>
         </div>
-
         <p className="text-center text-sm text-gray-500 mt-4">
           Already have an account?{" "}
           <Link href={`/login?invite=${inviteToken}`} className="text-indigo-600 hover:underline font-medium">
@@ -182,7 +160,6 @@ export default function RegisterPage() {
     );
   }
 
-  // Normal registration — create new household
   return (
     <div className="w-full max-w-sm">
       <div className="text-center mb-8">
@@ -192,7 +169,6 @@ export default function RegisterPage() {
         <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
         <p className="text-sm text-gray-500 mt-1">Start tracking your family&apos;s finances</p>
       </div>
-
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
         <form onSubmit={newForm.handleSubmit(onSubmitNew)} className="space-y-4">
           <Input label="Your Name" placeholder="John Smith"
@@ -210,21 +186,28 @@ export default function RegisterPage() {
               {CURRENCIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           </div>
-
-          {error && (
-            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{error}</div>
-          )}
-
+          {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{error}</div>}
           <Button type="submit" className="w-full" loading={newForm.formState.isSubmitting}>
             Create Account
           </Button>
         </form>
       </div>
-
       <p className="text-center text-sm text-gray-500 mt-4">
         Already have an account?{" "}
         <Link href="/login" className="text-indigo-600 hover:underline font-medium">Sign in</Link>
       </p>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="w-full max-w-sm">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 animate-pulse h-64" />
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }
