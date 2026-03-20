@@ -41,40 +41,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
-      if (account?.provider === "google" && user.email) {
-        try {
-          let dbUser = await prisma.user.findUnique({ where: { email: user.email } });
-
-          if (!dbUser) {
-            dbUser = await prisma.user.create({
-              data: {
-                email: user.email,
-                name: user.name ?? user.email.split("@")[0],
-                image: user.image,
-                currency: "USD",
-              },
-            });
-            await seedDefaultCategories(dbUser.id, prisma);
-          } else {
-            await prisma.user.update({
-              where: { id: dbUser.id },
-              data: { image: user.image },
-            });
-          }
-
-          user.id = dbUser.id;
-        } catch (err) {
-          console.error("Google sign-in error:", err);
-          return false;
-        }
-      }
-      return true;
-    },
-    async jwt({ token, user }) {
+    async jwt({ token, user, account, profile }) {
+      // On first sign-in, user object is present
       if (user) {
-        token.id = user.id;
-        token.image = user.image;
+        if (account?.provider === "google" && user.email) {
+          // For Google, look up the DB user by email to get the correct DB id
+          try {
+            let dbUser = await prisma.user.findUnique({ where: { email: user.email } });
+            if (!dbUser) {
+              dbUser = await prisma.user.create({
+                data: {
+                  email: user.email,
+                  name: user.name ?? user.email.split("@")[0],
+                  image: user.image,
+                  currency: "USD",
+                },
+              });
+              await seedDefaultCategories(dbUser.id, prisma);
+            } else {
+              await prisma.user.update({
+                where: { id: dbUser.id },
+                data: { image: user.image },
+              });
+            }
+            token.id = dbUser.id;
+            token.image = dbUser.image;
+          } catch (err) {
+            console.error("Google JWT error:", err);
+          }
+        } else {
+          // Credentials login — user.id is already the DB id
+          token.id = user.id;
+          token.image = user.image;
+        }
       }
       return token;
     },
