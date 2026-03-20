@@ -9,18 +9,18 @@ const schema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   targetAmount: z.number().positive(),
+  categoryId: z.string().min(1, "Category is required"),
   deadline: z.string().optional(),
 });
 
 export async function GET(req: NextRequest) {
   try {
     const session = await requireAuth();
-
     const goals = await prisma.goal.findMany({
       where: { userId: session.user.id },
+      include: { category: true },
       orderBy: { createdAt: "desc" },
     });
-
     return NextResponse.json(goals);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 401 });
@@ -36,11 +36,13 @@ export async function POST(req: NextRequest) {
     const goal = await prisma.goal.create({
       data: {
         userId: session.user.id,
+        categoryId: data.categoryId,
         name: data.name,
         description: data.description,
         targetAmount: data.targetAmount,
         deadline: data.deadline ? new Date(data.deadline) : undefined,
       },
+      include: { category: true },
     });
 
     return NextResponse.json(goal, { status: 201 });

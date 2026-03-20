@@ -9,7 +9,9 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Shield } from "lucide-react";
+import { ChangelogFooter } from "@/components/changelog-footer";
+import Link from "next/link";
 
 const googleSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -26,17 +28,11 @@ const emailSchema = z.object({
 const deleteEmailSchema = z.object({
   password: z.string().min(1, "Password is required"),
   confirm: z.string(),
-}).refine((d) => d.confirm === "DELETE", {
-  message: "Type DELETE to confirm",
-  path: ["confirm"],
-});
+}).refine((d) => d.confirm === "DELETE", { message: "Type DELETE to confirm", path: ["confirm"] });
 
 const deleteGoogleSchema = z.object({
   confirm: z.string(),
-}).refine((d) => d.confirm === "DELETE", {
-  message: "Type DELETE to confirm",
-  path: ["confirm"],
-});
+}).refine((d) => d.confirm === "DELETE", { message: "Type DELETE to confirm", path: ["confirm"] });
 
 type GoogleData = z.infer<typeof googleSchema>;
 type EmailData = z.infer<typeof emailSchema>;
@@ -63,16 +59,8 @@ export default function ProfilePage() {
   const [isGoogleUser, setIsGoogleUser] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const googleForm = useForm<GoogleData>({
-    resolver: zodResolver(googleSchema),
-    defaultValues: { name: "", currency: "USD" },
-  });
-
-  const emailForm = useForm<EmailData>({
-    resolver: zodResolver(emailSchema),
-    defaultValues: { name: "", currency: "USD", currentPassword: "", newPassword: "" },
-  });
-
+  const googleForm = useForm<GoogleData>({ resolver: zodResolver(googleSchema), defaultValues: { name: "", currency: "USD" } });
+  const emailForm = useForm<EmailData>({ resolver: zodResolver(emailSchema), defaultValues: { name: "", currency: "USD", currentPassword: "", newPassword: "" } });
   const deleteEmailForm = useForm<DeleteEmailData>({ resolver: zodResolver(deleteEmailSchema) });
   const deleteGoogleForm = useForm<DeleteGoogleData>({ resolver: zodResolver(deleteGoogleSchema) });
 
@@ -160,11 +148,9 @@ export default function ProfilePage() {
           <div className="flex items-center gap-4 py-2">
             <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden flex-shrink-0">
               {session?.user?.image ? (
-                <img src={session.user.image} alt="avatar" className="w-full h-full object-cover rounded-full" />
+                <img src={session.user.image} alt="avatar" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
               ) : (
-                <span className="text-2xl font-bold text-indigo-700">
-                  {session?.user?.name?.[0]?.toUpperCase()}
-                </span>
+                <span className="text-2xl font-bold text-indigo-700">{session?.user?.name?.[0]?.toUpperCase()}</span>
               )}
             </div>
             <div>
@@ -173,9 +159,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-2 mt-0.5">
                 <p className="text-xs text-gray-400">Currency: {currentCurrency}</p>
                 {isGoogleUser && (
-                  <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
-                    Google account
-                  </span>
+                  <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">Google account</span>
                 )}
               </div>
             </div>
@@ -184,9 +168,7 @@ export default function ProfilePage() {
         <CardContent>
           {isGoogleUser ? (
             <form onSubmit={googleForm.handleSubmit(onSubmitGoogle)} className="space-y-4">
-              <Input label="Display Name"
-                {...googleForm.register("name")}
-                error={googleForm.formState.errors.name?.message} />
+              <Input label="Display Name" {...googleForm.register("name")} error={googleForm.formState.errors.name?.message} />
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-gray-700">Currency</label>
                 <select {...googleForm.register("currency")}
@@ -203,9 +185,7 @@ export default function ProfilePage() {
             </form>
           ) : (
             <form onSubmit={emailForm.handleSubmit(onSubmitEmail)} className="space-y-4">
-              <Input label="Display Name"
-                {...emailForm.register("name")}
-                error={emailForm.formState.errors.name?.message} />
+              <Input label="Display Name" {...emailForm.register("name")} error={emailForm.formState.errors.name?.message} />
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-gray-700">Currency</label>
                 <select {...emailForm.register("currency")}
@@ -214,13 +194,11 @@ export default function ProfilePage() {
                 </select>
               </div>
               <div className="border-t border-gray-100 pt-4 space-y-4">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Password</p>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Change Password</p>
                 <Input label="Current Password (required to save)" type="password"
-                  {...emailForm.register("currentPassword")}
-                  error={emailForm.formState.errors.currentPassword?.message} />
+                  {...emailForm.register("currentPassword")} error={emailForm.formState.errors.currentPassword?.message} />
                 <Input label="New Password (leave blank to keep current)" type="password" placeholder="••••••••"
-                  {...emailForm.register("newPassword")}
-                  error={emailForm.formState.errors.newPassword?.message} />
+                  {...emailForm.register("newPassword")} error={emailForm.formState.errors.newPassword?.message} />
               </div>
               {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{error}</div>}
               {success && <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-600">{success}</div>}
@@ -230,15 +208,14 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
+      {/* Danger Zone */}
       <Card className="border-red-200">
         <CardContent className="py-5">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <h3 className="text-sm font-semibold text-red-700">Delete Account</h3>
-              <p className="text-xs text-gray-500 mt-1">
-                Permanently delete your account and all your financial data. This cannot be undone.
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Permanently delete your account and all your financial data. This cannot be undone.</p>
               <Button variant="destructive" size="sm" className="mt-3"
                 onClick={() => { deleteEmailForm.reset(); deleteGoogleForm.reset(); setDeleteError(""); setDeleteOpen(true); }}>
                 Delete My Account
@@ -248,6 +225,18 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
+      {/* Privacy Policy link */}
+      <div className="flex items-center gap-2 px-1">
+        <Shield className="h-4 w-4 text-gray-400" />
+        <Link href="/privacy" target="_blank" className="text-xs text-gray-500 hover:text-indigo-600 hover:underline">
+          Privacy Policy — your data is private and belongs to you
+        </Link>
+      </div>
+
+      {/* Changelog / What's New */}
+      <ChangelogFooter />
+
+      {/* Delete Modal */}
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Account">
         <div className="space-y-4">
           <div className="p-3 rounded-lg bg-red-50 border border-red-200">
@@ -270,16 +259,13 @@ export default function ProfilePage() {
               {deleteError && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{deleteError}</div>}
               <div className="flex gap-2 pt-2">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setDeleteOpen(false)}>Cancel</Button>
-                <Button type="submit" variant="destructive" className="flex-1" loading={deleteGoogleForm.formState.isSubmitting}>
-                  Delete My Account
-                </Button>
+                <Button type="submit" variant="destructive" className="flex-1" loading={deleteGoogleForm.formState.isSubmitting}>Delete My Account</Button>
               </div>
             </form>
           ) : (
             <form onSubmit={deleteEmailForm.handleSubmit(onDeleteEmail)} className="space-y-4">
               <Input label="Enter your password to confirm" type="password" placeholder="••••••••"
-                {...deleteEmailForm.register("password")}
-                error={deleteEmailForm.formState.errors.password?.message} />
+                {...deleteEmailForm.register("password")} error={deleteEmailForm.formState.errors.password?.message} />
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-gray-700">
                   Type <span className="font-mono font-bold text-red-600">DELETE</span> to confirm
@@ -294,9 +280,7 @@ export default function ProfilePage() {
               {deleteError && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{deleteError}</div>}
               <div className="flex gap-2 pt-2">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setDeleteOpen(false)}>Cancel</Button>
-                <Button type="submit" variant="destructive" className="flex-1" loading={deleteEmailForm.formState.isSubmitting}>
-                  Delete My Account
-                </Button>
+                <Button type="submit" variant="destructive" className="flex-1" loading={deleteEmailForm.formState.isSubmitting}>Delete My Account</Button>
               </div>
             </form>
           )}

@@ -6,9 +6,10 @@ import { Sidebar, MenuButton } from "@/components/layout/sidebar";
 interface AppShellProps {
   children: React.ReactNode;
   userName: string;
+  userImage?: string | null;
 }
 
-export function AppShell({ children, userName }: AppShellProps) {
+export function AppShell({ children, userName, userImage }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -20,11 +21,20 @@ export function AppShell({ children, userName }: AppShellProps) {
           <div className="flex items-center gap-3">
             <MenuButton onClick={() => setSidebarOpen(true)} />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-              <span className="text-xs font-semibold text-indigo-700">
-                {userName?.[0]?.toUpperCase() ?? "U"}
-              </span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-indigo-100 flex items-center justify-center ring-2 ring-indigo-100">
+              {userImage ? (
+                <img
+                  src={userImage}
+                  alt={userName}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span className="text-xs font-semibold text-indigo-700">
+                  {userName?.[0]?.toUpperCase() ?? "U"}
+                </span>
+              )}
             </div>
             <span className="hidden sm:block text-sm font-medium text-gray-700">{userName}</span>
           </div>

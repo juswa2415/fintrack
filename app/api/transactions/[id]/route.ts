@@ -48,7 +48,24 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     });
     if (!tx) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    const recurringId = tx.recurringTransactionId;
+
     await prisma.transaction.delete({ where: { id } });
+
+    // If this transaction was linked to a recurring entry, recalculate lastLogged
+    if (recurringId) {
+      // Find the most recent remaining transaction for this recurring
+      const latest = await prisma.transaction.findFirst({
+        where: { recurringTransactionId: recurringId, userId: session.user.id },
+        orderBy: { date: "desc" },
+      });
+
+      await prisma.recurringTransaction.update({
+        where: { id: recurringId },
+        data: { lastLogged: latest?.date ?? null },
+      });
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
