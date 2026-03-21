@@ -4,16 +4,15 @@ import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { useCurrency } from "@/lib/use-currency";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Plus, Pencil, Trash2, Filter } from "lucide-react";
 
-interface Category {
-  id: string; name: string; type: string; color: string;
-}
+interface Category { id: string; name: string; type: string; color: string; }
 interface Transaction {
   id: string; amount: number; type: string; date: string;
   description: string | null; category: Category;
@@ -30,6 +29,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function TransactionsPage() {
+  const currency = useCurrency();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -42,7 +42,6 @@ export default function TransactionsPage() {
     resolver: zodResolver(schema),
     defaultValues: { type: "EXPENSE", date: new Date().toISOString().split("T")[0] },
   });
-
   const selectedType = watch("type");
 
   const fetchData = useCallback(async () => {
@@ -114,24 +113,16 @@ export default function TransactionsPage() {
         <CardHeader>
           <div className="flex items-center gap-3 flex-wrap">
             <Filter className="h-4 w-4 text-gray-400" />
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="h-8 rounded-lg border border-gray-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
+            <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
+              className="h-8 rounded-lg border border-gray-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
               <option value="">All Types</option>
               <option value="INCOME">Income</option>
               <option value="EXPENSE">Expense</option>
             </select>
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="h-8 rounded-lg border border-gray-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
+            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}
+              className="h-8 rounded-lg border border-gray-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
               <option value="">All Categories</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
         </CardHeader>
@@ -148,7 +139,6 @@ export default function TransactionsPage() {
                     <th className="text-left px-6 py-3 font-medium text-gray-600">Date</th>
                     <th className="text-left px-6 py-3 font-medium text-gray-600">Description</th>
                     <th className="text-left px-6 py-3 font-medium text-gray-600">Category</th>
-                    
                     <th className="text-right px-6 py-3 font-medium text-gray-600">Amount</th>
                     <th className="px-6 py-3" />
                   </tr>
@@ -165,14 +155,16 @@ export default function TransactionsPage() {
                         </span>
                       </td>
                       <td className={`px-6 py-3 text-right font-semibold ${tx.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
-                        {tx.type === "INCOME" ? "+" : "-"}{formatCurrency(tx.amount)}
+                        {tx.type === "INCOME" ? "+" : "-"}{formatCurrency(tx.amount, currency)}
                       </td>
                       <td className="px-6 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => openEdit(tx)} className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                          <button onClick={() => openEdit(tx)}
+                            className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
-                          <button onClick={() => deleteTx(tx.id)} className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                          <button onClick={() => deleteTx(tx.id)}
+                            className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -190,16 +182,13 @@ export default function TransactionsPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="flex gap-2">
             {(["INCOME", "EXPENSE"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
+              <button key={t} type="button"
                 onClick={() => { setValue("type", t); setValue("categoryId", ""); }}
                 className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
                   selectedType === t
                     ? t === "INCOME" ? "bg-green-600 text-white border-green-600" : "bg-red-600 text-white border-red-600"
                     : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
+                }`}>
                 {t === "INCOME" ? "Income" : "Expense"}
               </button>
             ))}
@@ -207,47 +196,22 @@ export default function TransactionsPage() {
 
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-700">Category</label>
-            <select
-              {...register("categoryId")}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
+            <select {...register("categoryId")}
+              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
               <option value="">Select category</option>
-              {filteredCats.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
+              {filteredCats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             {errors.categoryId && <p className="text-xs text-red-600">{errors.categoryId.message}</p>}
           </div>
 
-          <Input
-            label="Amount"
-            type="number"
-            step="0.01"
-            placeholder="0.00"
-            {...register("amount", { valueAsNumber: true })}
-            error={errors.amount?.message}
-          />
-          <Input
-            label="Date"
-            type="date"
-            {...register("date")}
-            error={errors.date?.message}
-          />
-          <Input
-            label="Description (optional)"
-            placeholder="e.g. Monthly salary"
-            {...register("description")}
-          />
-          <Input
-            label="Notes (optional)"
-            placeholder="Additional notes"
-            {...register("notes")}
-          />
+          <Input label="Amount" type="number" step="0.01" placeholder="0.00"
+            {...register("amount", { valueAsNumber: true })} error={errors.amount?.message} />
+          <Input label="Date" type="date" {...register("date")} error={errors.date?.message} />
+          <Input label="Description (optional)" placeholder="e.g. Monthly salary" {...register("description")} />
+          <Input label="Notes (optional)" placeholder="Additional notes" {...register("notes")} />
 
           <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>
-              Cancel
-            </Button>
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>Cancel</Button>
             <Button type="submit" className="flex-1" loading={isSubmitting}>
               {editTx ? "Save Changes" : "Add Transaction"}
             </Button>

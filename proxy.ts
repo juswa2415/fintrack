@@ -9,8 +9,9 @@ export const proxy = auth((req) => {
   const isInvitePage = pathname.startsWith("/invite");
   const isApiAuth = pathname.startsWith("/api/auth");
   const isApiRegister = pathname.startsWith("/api/register");
+  const isPrivacyPage = pathname.startsWith("/privacy"); // always public
 
-  if (isApiAuth || isApiRegister || isInvitePage) return NextResponse.next();
+  if (isApiAuth || isApiRegister || isInvitePage || isPrivacyPage) return NextResponse.next();
 
   if (!isLoggedIn && !isAuthPage) {
     return NextResponse.redirect(new URL("/login", req.url));

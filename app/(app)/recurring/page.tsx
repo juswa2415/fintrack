@@ -10,7 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useCurrency } from "@/lib/use-currency";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Trash2, CheckCircle2, Clock, Pencil, AlertCircle } from "lucide-react";
+import {
+  Plus, Trash2, CheckCircle2, Clock, Pencil,
+  AlertCircle, TrendingUp, TrendingDown,
+} from "lucide-react";
 
 interface Category { id: string; name: string; type: string; color: string; }
 interface Recurring {
@@ -19,11 +22,7 @@ interface Recurring {
   lastLogged: string | null; startDate: string;
 }
 interface Toast { id: string; message: string; }
-interface MissedPaymentInfo {
-  item: Recurring;
-  missedDates: string[];
-  selectedCount: number;
-}
+interface MissedPaymentInfo { item: Recurring; missedDates: string[]; selectedCount: number; }
 
 const schema = z.object({
   categoryId: z.string().min(1, "Required"),
@@ -73,12 +72,90 @@ function getDueStatus(item: Recurring): "overdue" | "due-soon" | "logged-period"
   return "upcoming";
 }
 
-// Label helpers based on type
-function getLoggedLabel(type: string) {
-  return type === "INCOME" ? "Received ✓" : "Paid ✓";
-}
-function getActionLabel(type: string) {
-  return type === "INCOME" ? "Record Income" : "Mark as Paid";
+function getLoggedLabel(type: string) { return type === "INCOME" ? "Received ✓" : "Paid ✓"; }
+function getActionLabel(type: string) { return type === "INCOME" ? "Record Income" : "Mark as Paid"; }
+
+// Single recurring item card — reused in both sections
+function RecurringItem({
+  item, currency, loggingId, onLog, onEdit, onDelete,
+}: {
+  item: Recurring; currency: string; loggingId: string | null;
+  onLog: (item: Recurring) => void;
+  onEdit: (item: Recurring) => void;
+  onDelete: (id: string) => void;
+}) {
+  const status = getDueStatus(item);
+  return (
+    <Card className={status === "overdue" ? "border-red-200" : status === "due-soon" ? "border-amber-200" : ""}>
+      <CardContent className="flex items-center justify-between py-3.5 gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+            style={{ backgroundColor: item.category.color }}>
+            {item.category.name[0]}
+          </span>
+          <div className="min-w-0">
+            <p className="font-medium text-gray-900 truncate text-sm">{item.description || item.category.name}</p>
+            <p className="text-xs text-gray-500">
+              {item.category.name} · {item.frequency.charAt(0) + item.frequency.slice(1).toLowerCase()}
+            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              {status === "logged-period" && (
+                <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {item.type === "INCOME" ? "Received" : "Paid"}{" "}
+                  {item.lastLogged ? new Date(item.lastLogged).toLocaleDateString() : ""}
+                </span>
+              )}
+              {status === "overdue" && (
+                <span className="inline-flex items-center gap-1 text-xs text-red-600 font-medium">
+                  <AlertCircle className="h-3 w-3" /> Overdue
+                </span>
+              )}
+              {status === "due-soon" && (
+                <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-medium">
+                  <Clock className="h-3 w-3" /> Due soon
+                </span>
+              )}
+              {status === "upcoming" && item.lastLogged && (
+                <span className="text-xs text-gray-400">Last: {new Date(item.lastLogged).toLocaleDateString()}</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className={`text-sm font-bold ${item.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
+            {item.type === "INCOME" ? "+" : "-"}{formatCurrency(item.amount, currency)}
+          </span>
+          <button
+            onClick={() => onLog(item)}
+            disabled={loggingId === item.id}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
+              status === "logged-period"
+                ? "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
+                : status === "overdue"
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : status === "due-soon"
+                ? "bg-amber-500 text-white hover:bg-amber-600"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            {status === "logged-period"
+              ? <><CheckCircle2 className="h-3.5 w-3.5" /> {getLoggedLabel(item.type)}</>
+              : getActionLabel(item.type)}
+          </button>
+          <button onClick={() => onEdit(item)}
+            className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={() => onDelete(item.id)}
+            className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function RecurringPage() {
@@ -87,7 +164,7 @@ export default function RecurringPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<Recurring | null>(null);
-  const [originalStartDate, setOriginalStartDate] = useState<string>("");
+  const [originalStartDate, setOriginalStartDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [loggingId, setLoggingId] = useState<string | null>(null);
@@ -145,17 +222,12 @@ export default function RecurringPage() {
 
   const onSubmit = async (data: FormData) => {
     if (editItem) {
-      // Check if startDate moved earlier — reset lastLogged if so
       const startDateChanged = data.startDate !== originalStartDate;
       const newStartEarlier = startDateChanged && new Date(data.startDate) < new Date(originalStartDate);
-
       await fetch(`/api/recurring/${editItem.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          resetLastLogged: newStartEarlier, // tell API to reset payment history
-        }),
+        body: JSON.stringify({ ...data, resetLastLogged: newStartEarlier }),
       });
       setEditItem(null);
     } else {
@@ -189,8 +261,15 @@ export default function RecurringPage() {
   };
 
   const filteredCats = categories.filter((c) => !selectedType || c.type === selectedType);
-  const dueItems = items.filter((i) => { const s = getDueStatus(i); return s === "overdue" || s === "due-soon"; });
   const startDateMovedEarlier = editItem && currentStartDate && new Date(currentStartDate) < new Date(originalStartDate);
+
+  const incomeItems = items.filter((i) => i.type === "INCOME");
+  const expenseItems = items.filter((i) => i.type === "EXPENSE");
+
+  const totalMonthlyIncome = incomeItems.reduce((s, i) => s + (i.frequency === "MONTHLY" ? i.amount : 0), 0);
+  const totalMonthlyExpense = expenseItems.reduce((s, i) => s + (i.frequency === "MONTHLY" ? i.amount : 0), 0);
+
+  const sharedProps = { currency, loggingId, onLog: doLog, onEdit: openEdit, onDelete: deleteItem };
 
   return (
     <div className="space-y-6">
@@ -214,103 +293,78 @@ export default function RecurringPage() {
         </Button>
       </div>
 
-      {dueItems.length > 0 && (
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-          <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-amber-800">
-              {dueItems.length} transaction{dueItems.length > 1 ? "s" : ""} need{dueItems.length === 1 ? "s" : ""} to be logged
-            </p>
-            <p className="text-xs text-amber-600 mt-0.5">
-              {dueItems.map((i) => i.description || i.category.name).join(", ")}
-            </p>
+      {loading ? (
+        <p className="text-center py-12 text-gray-400">Loading...</p>
+      ) : items.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <p className="text-sm">No recurring transactions yet.</p>
+          <p className="text-xs mt-1">Add your regular income and bills to track them here.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+          {/* Income section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-green-100 flex items-center justify-center">
+                  <TrendingUp className="h-3.5 w-3.5 text-green-600" />
+                </div>
+                <h2 className="text-sm font-semibold text-gray-900">Income</h2>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{incomeItems.length}</span>
+              </div>
+              {totalMonthlyIncome > 0 && (
+                <span className="text-xs font-semibold text-green-600">
+                  +{formatCurrency(totalMonthlyIncome, currency)}/mo
+                </span>
+              )}
+            </div>
+
+            {incomeItems.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-xl">
+                No recurring income added yet
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {incomeItems.map((item) => (
+                  <RecurringItem key={item.id} item={item} {...sharedProps} />
+                ))}
+              </div>
+            )}
           </div>
+
+          {/* Expense section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-red-100 flex items-center justify-center">
+                  <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+                </div>
+                <h2 className="text-sm font-semibold text-gray-900">Expenses</h2>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{expenseItems.length}</span>
+              </div>
+              {totalMonthlyExpense > 0 && (
+                <span className="text-xs font-semibold text-red-500">
+                  -{formatCurrency(totalMonthlyExpense, currency)}/mo
+                </span>
+              )}
+            </div>
+
+            {expenseItems.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-xl">
+                No recurring expenses added yet
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {expenseItems.map((item) => (
+                  <RecurringItem key={item.id} item={item} {...sharedProps} />
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       )}
-
-      <div className="grid gap-3">
-        {loading ? (
-          <p className="text-center py-12 text-gray-400">Loading...</p>
-        ) : items.length === 0 ? (
-          <Card><CardContent className="text-center py-12 text-gray-400">No recurring transactions yet.</CardContent></Card>
-        ) : (
-          items.map((item) => {
-            const status = getDueStatus(item);
-            return (
-              <Card key={item.id} className={status === "overdue" ? "border-red-200" : status === "due-soon" ? "border-amber-200" : ""}>
-                <CardContent className="flex items-center justify-between py-4 gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                      style={{ backgroundColor: item.category.color }}>
-                      {item.category.name[0]}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{item.description || item.category.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {item.category.name} · {item.frequency.charAt(0) + item.frequency.slice(1).toLowerCase()}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {status === "logged-period" && (
-                          <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
-                            <CheckCircle2 className="h-3 w-3" />
-                            {item.type === "INCOME" ? "Received" : "Paid"} {item.lastLogged ? new Date(item.lastLogged).toLocaleDateString() : ""}
-                          </span>
-                        )}
-                        {status === "overdue" && (
-                          <span className="inline-flex items-center gap-1 text-xs text-red-600 font-medium">
-                            <AlertCircle className="h-3 w-3" /> Overdue
-                          </span>
-                        )}
-                        {status === "due-soon" && (
-                          <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-medium">
-                            <Clock className="h-3 w-3" /> Due soon
-                          </span>
-                        )}
-                        {status === "upcoming" && item.lastLogged && (
-                          <span className="text-xs text-gray-400">
-                            Last: {new Date(item.lastLogged).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className={`text-base font-bold ${item.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
-                      {item.type === "INCOME" ? "+" : "-"}{formatCurrency(item.amount, currency)}
-                    </span>
-                    <button
-                      onClick={() => doLog(item)}
-                      disabled={loggingId === item.id}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
-                        status === "logged-period"
-                          ? "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
-                          : status === "overdue"
-                          ? "bg-red-600 text-white hover:bg-red-700"
-                          : status === "due-soon"
-                          ? "bg-amber-500 text-white hover:bg-amber-600"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      {status === "logged-period" ? (
-                        <><CheckCircle2 className="h-3.5 w-3.5" /> {getLoggedLabel(item.type)}</>
-                      ) : getActionLabel(item.type)}
-                    </button>
-                    <button onClick={() => openEdit(item)}
-                      className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => deleteItem(item.id)}
-                      className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
 
       {/* Double-log confirmation */}
       <Modal open={!!confirmItem} onClose={() => setConfirmItem(null)} title="Already logged this period">
@@ -323,9 +377,7 @@ export default function RecurringPage() {
                 on {confirmItem.lastLogged ? new Date(confirmItem.lastLogged).toLocaleDateString() : "a previous date"}.
               </p>
             </div>
-            <p className="text-sm text-gray-600">
-              Log another {confirmItem.type === "INCOME" ? "income entry" : "payment"}? Only do this for a genuine second transaction.
-            </p>
+            <p className="text-sm text-gray-600">Log another {confirmItem.type === "INCOME" ? "income entry" : "payment"}? Only do this for a genuine second transaction.</p>
             <div className="flex gap-2 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setConfirmItem(null)}>Cancel</Button>
               <Button variant="destructive" className="flex-1"
@@ -341,8 +393,7 @@ export default function RecurringPage() {
       <Modal open={!!missedPayment} onClose={() => setMissedPayment(null)} title="Missed Payments Detected">
         {missedPayment && (
           <MissedPaymentsModal
-            info={missedPayment}
-            currency={currency}
+            info={missedPayment} currency={currency}
             onConfirm={(dates) => { const item = missedPayment.item; setMissedPayment(null); doLog(item, true, dates); }}
             onCancel={() => setMissedPayment(null)}
           />
@@ -383,14 +434,11 @@ export default function RecurringPage() {
             </select>
           </div>
           <Input label="Start Date" type="date" {...register("startDate")} />
-
-          {/* Warn user if start date moved earlier */}
           {startDateMovedEarlier && (
             <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
-              ⚠️ You moved the start date earlier. Payment history will be reset so missed periods can be detected correctly.
+              ⚠️ Moving start date earlier will reset payment history so missed periods are detected correctly.
             </div>
           )}
-
           <Input label="Description (optional)" placeholder="e.g. Monthly electricity bill" {...register("description")} />
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" className="flex-1"
@@ -405,13 +453,9 @@ export default function RecurringPage() {
   );
 }
 
-function MissedPaymentsModal({
-  info, currency, onConfirm, onCancel,
-}: {
-  info: MissedPaymentInfo;
-  currency: string;
-  onConfirm: (dates: string[]) => void;
-  onCancel: () => void;
+function MissedPaymentsModal({ info, currency, onConfirm, onCancel }: {
+  info: MissedPaymentInfo; currency: string;
+  onConfirm: (dates: string[]) => void; onCancel: () => void;
 }) {
   const [count, setCount] = useState(info.missedDates.length);
   const selectedDates = info.missedDates.slice(0, count);
@@ -455,7 +499,7 @@ function MissedPaymentsModal({
       <div className="flex gap-2 pt-2">
         <Button variant="outline" className="flex-1" onClick={onCancel}>Cancel</Button>
         <Button className="flex-1" onClick={() => onConfirm(selectedDates)}>
-          {info.item.type === "INCOME" ? `Record ${count} Income Period${count > 1 ? "s" : ""}` : `Log ${count} Payment${count > 1 ? "s" : ""}`}
+          {info.item.type === "INCOME" ? `Record ${count} Period${count > 1 ? "s" : ""}` : `Log ${count} Payment${count > 1 ? "s" : ""}`}
         </Button>
       </div>
     </div>

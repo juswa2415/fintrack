@@ -17,22 +17,19 @@ const googleSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   currency: z.string().min(1),
 });
-
 const emailSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   currency: z.string().min(1),
   currentPassword: z.string().min(1, "Required to save changes"),
   newPassword: z.string().min(6).optional().or(z.literal("")),
 });
-
 const deleteEmailSchema = z.object({
   password: z.string().min(1, "Password is required"),
   confirm: z.string(),
-}).refine((d) => d.confirm === "DELETE", { message: "Type DELETE to confirm", path: ["confirm"] });
-
+}).refine((d) => d.confirm === "DELETE", { message: 'Type DELETE to confirm', path: ["confirm"] });
 const deleteGoogleSchema = z.object({
   confirm: z.string(),
-}).refine((d) => d.confirm === "DELETE", { message: "Type DELETE to confirm", path: ["confirm"] });
+}).refine((d) => d.confirm === "DELETE", { message: 'Type DELETE to confirm', path: ["confirm"] });
 
 type GoogleData = z.infer<typeof googleSchema>;
 type EmailData = z.infer<typeof emailSchema>;
@@ -122,7 +119,7 @@ export default function ProfilePage() {
     await signOut({ callbackUrl: "/login" });
   };
 
-  const onDeleteGoogle = async (data: DeleteGoogleData) => {
+  const onDeleteGoogle = async () => {
     setDeleteError("");
     const res = await fetch("/api/account", {
       method: "DELETE",
@@ -134,107 +131,116 @@ export default function ProfilePage() {
     await signOut({ callbackUrl: "/login" });
   };
 
-  if (!loaded) return <div className="animate-pulse h-64 bg-gray-100 rounded-2xl max-w-md" />;
+  if (!loaded) return <div className="animate-pulse h-64 bg-gray-100 rounded-2xl" />;
 
   return (
-    <div className="space-y-6 max-w-md">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
         <p className="text-sm text-gray-500 mt-1">Update your account information</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-4 py-2">
-            <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-              {session?.user?.image ? (
-                <img src={session.user.image} alt="avatar" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+      {/* Two-column layout — fills dead space */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Left column — account settings */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-4 py-2">
+                <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {session?.user?.image ? (
+                    <img src={session.user.image} alt="avatar" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span className="text-2xl font-bold text-indigo-700">{session?.user?.name?.[0]?.toUpperCase()}</span>
+                  )}
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">{session?.user?.name}</p>
+                  <p className="text-sm text-gray-500">{session?.user?.email}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs text-gray-400">Currency: {currentCurrency}</p>
+                    {isGoogleUser && (
+                      <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">Google account</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isGoogleUser ? (
+                <form onSubmit={googleForm.handleSubmit(onSubmitGoogle)} className="space-y-4">
+                  <Input label="Display Name" {...googleForm.register("name")} error={googleForm.formState.errors.name?.message} />
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Currency</label>
+                    <select {...googleForm.register("currency")}
+                      className="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                      {CURRENCIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                  </div>
+                  <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+                    Your account is managed by Google. Password changes are not available.
+                  </p>
+                  {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{error}</div>}
+                  {success && <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-600">{success}</div>}
+                  <Button type="submit" loading={googleForm.formState.isSubmitting}>Save Changes</Button>
+                </form>
               ) : (
-                <span className="text-2xl font-bold text-indigo-700">{session?.user?.name?.[0]?.toUpperCase()}</span>
+                <form onSubmit={emailForm.handleSubmit(onSubmitEmail)} className="space-y-4">
+                  <Input label="Display Name" {...emailForm.register("name")} error={emailForm.formState.errors.name?.message} />
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Currency</label>
+                    <select {...emailForm.register("currency")}
+                      className="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                      {CURRENCIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="border-t border-gray-100 pt-4 space-y-4">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Change Password</p>
+                    <Input label="Current Password (required to save)" type="password"
+                      {...emailForm.register("currentPassword")} error={emailForm.formState.errors.currentPassword?.message} />
+                    <Input label="New Password (leave blank to keep current)" type="password" placeholder="••••••••"
+                      {...emailForm.register("newPassword")} error={emailForm.formState.errors.newPassword?.message} />
+                  </div>
+                  {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{error}</div>}
+                  {success && <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-600">{success}</div>}
+                  <Button type="submit" loading={emailForm.formState.isSubmitting}>Save Changes</Button>
+                </form>
               )}
-            </div>
-            <div>
-              <p className="font-semibold text-gray-900">{session?.user?.name}</p>
-              <p className="text-sm text-gray-500">{session?.user?.email}</p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <p className="text-xs text-gray-400">Currency: {currentCurrency}</p>
-                {isGoogleUser && (
-                  <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">Google account</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isGoogleUser ? (
-            <form onSubmit={googleForm.handleSubmit(onSubmitGoogle)} className="space-y-4">
-              <Input label="Display Name" {...googleForm.register("name")} error={googleForm.formState.errors.name?.message} />
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700">Currency</label>
-                <select {...googleForm.register("currency")}
-                  className="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  {CURRENCIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
-              </div>
-              <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
-                Your account is managed by Google. Password changes are not available.
-              </p>
-              {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{error}</div>}
-              {success && <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-600">{success}</div>}
-              <Button type="submit" loading={googleForm.formState.isSubmitting}>Save Changes</Button>
-            </form>
-          ) : (
-            <form onSubmit={emailForm.handleSubmit(onSubmitEmail)} className="space-y-4">
-              <Input label="Display Name" {...emailForm.register("name")} error={emailForm.formState.errors.name?.message} />
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700">Currency</label>
-                <select {...emailForm.register("currency")}
-                  className="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  {CURRENCIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
-              </div>
-              <div className="border-t border-gray-100 pt-4 space-y-4">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Change Password</p>
-                <Input label="Current Password (required to save)" type="password"
-                  {...emailForm.register("currentPassword")} error={emailForm.formState.errors.currentPassword?.message} />
-                <Input label="New Password (leave blank to keep current)" type="password" placeholder="••••••••"
-                  {...emailForm.register("newPassword")} error={emailForm.formState.errors.newPassword?.message} />
-              </div>
-              {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{error}</div>}
-              {success && <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-600">{success}</div>}
-              <Button type="submit" loading={emailForm.formState.isSubmitting}>Save Changes</Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {/* Danger Zone */}
-      <Card className="border-red-200">
-        <CardContent className="py-5">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-red-700">Delete Account</h3>
-              <p className="text-xs text-gray-500 mt-1">Permanently delete your account and all your financial data. This cannot be undone.</p>
-              <Button variant="destructive" size="sm" className="mt-3"
-                onClick={() => { deleteEmailForm.reset(); deleteGoogleForm.reset(); setDeleteError(""); setDeleteOpen(true); }}>
-                Delete My Account
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          {/* Danger Zone */}
+          <Card className="border-red-200">
+            <CardContent className="py-5">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-red-700">Delete Account</h3>
+                  <p className="text-xs text-gray-500 mt-1">Permanently delete your account and all your financial data. This cannot be undone.</p>
+                  <Button variant="destructive" size="sm" className="mt-3"
+                    onClick={() => { deleteEmailForm.reset(); deleteGoogleForm.reset(); setDeleteError(""); setDeleteOpen(true); }}>
+                    Delete My Account
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Privacy Policy link */}
-      <div className="flex items-center gap-2 px-1">
-        <Shield className="h-4 w-4 text-gray-400" />
-        <Link href="/privacy" target="_blank" className="text-xs text-gray-500 hover:text-indigo-600 hover:underline">
-          Privacy Policy — your data is private and belongs to you
-        </Link>
+          {/* Privacy link */}
+          <div className="flex items-center gap-2 px-1">
+            <Shield className="h-4 w-4 text-gray-400" />
+            <Link href="/privacy" target="_blank" className="text-xs text-gray-500 hover:text-indigo-600 hover:underline">
+              Privacy Policy — your data is private and belongs to you
+            </Link>
+          </div>
+        </div>
+
+        {/* Right column — What's New fills the dead space perfectly */}
+        <div className="lg:col-span-1">
+          <ChangelogFooter />
+        </div>
       </div>
-
-      {/* Changelog / What's New */}
-      <ChangelogFooter />
 
       {/* Delete Modal */}
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Account">

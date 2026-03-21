@@ -5,7 +5,7 @@ export default function PrivacyPage() {
   const lastUpdated = "March 21, 2026";
 
   return (
-    <div className="min-h-full bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto px-4 py-12">
         {/* Header */}
         <div className="text-center mb-10">
@@ -20,7 +20,6 @@ export default function PrivacyPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 space-y-8 text-sm text-gray-700 leading-relaxed">
-
           <section className="flex gap-4">
             <Shield className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" />
             <div>
@@ -39,7 +38,7 @@ export default function PrivacyPage() {
             <Eye className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" />
             <div>
               <h2 className="text-base font-semibold text-gray-900 mb-2">What data we collect</h2>
-              <ul className="space-y-2 list-none">
+              <ul className="space-y-2">
                 {[
                   ["Account information", "Your name and email address, provided during registration or via Google sign-in."],
                   ["Profile picture", "If you sign in with Google, we store your Google profile photo URL."],
@@ -47,7 +46,7 @@ export default function PrivacyPage() {
                   ["Session data", "An encrypted session token stored in your browser to keep you logged in. It does not contain your financial data."],
                   ["Technical logs", "Basic server logs for error monitoring. These do not contain your financial data."],
                 ].map(([title, desc]) => (
-                  <li key={title as string} className="flex gap-2">
+                  <li key={title as string} className="flex gap-2 list-none">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0 mt-2" />
                     <span><strong className="text-gray-900">{title}:</strong> {desc}</span>
                   </li>
@@ -62,7 +61,7 @@ export default function PrivacyPage() {
             <Lock className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" />
             <div>
               <h2 className="text-base font-semibold text-gray-900 mb-2">How we protect your data</h2>
-              <ul className="space-y-2 list-none">
+              <ul className="space-y-2">
                 {[
                   "All data is transmitted over HTTPS — encrypted in transit.",
                   "Passwords are hashed using bcrypt (cost factor 12) — we never store your plain-text password.",
@@ -70,7 +69,7 @@ export default function PrivacyPage() {
                   "Each user's data is isolated — no user can access another user's financial information.",
                   "Google sign-in users authenticate through Google's secure OAuth system — we never receive or store your Google password.",
                 ].map((item, i) => (
-                  <li key={i} className="flex gap-2">
+                  <li key={i} className="flex gap-2 list-none">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0 mt-2" />
                     <span>{item}</span>
                   </li>
@@ -82,7 +81,7 @@ export default function PrivacyPage() {
           <hr className="border-gray-100" />
 
           <section className="flex gap-4">
-            <div className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5 font-bold text-center">👥</div>
+            <span className="text-lg flex-shrink-0 mt-0.5">👥</span>
             <div>
               <h2 className="text-base font-semibold text-gray-900 mb-2">Who can see your data</h2>
               <p>
@@ -97,17 +96,17 @@ export default function PrivacyPage() {
           <hr className="border-gray-100" />
 
           <section className="flex gap-4">
-            <div className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5 font-bold text-center">🌐</div>
+            <span className="text-lg flex-shrink-0 mt-0.5">🌐</span>
             <div>
               <h2 className="text-base font-semibold text-gray-900 mb-2">Third-party services</h2>
               <p className="mb-2">We use the following trusted services to operate FinTrack:</p>
-              <ul className="space-y-1 list-none">
+              <ul className="space-y-1">
                 {[
                   ["Neon (neon.tech)", "Database hosting"],
                   ["Vercel (vercel.com)", "Application hosting and deployment"],
                   ["Google OAuth", "Optional sign-in method — governed by Google's privacy policy"],
                 ].map(([name, role]) => (
-                  <li key={name as string} className="flex gap-2">
+                  <li key={name as string} className="flex gap-2 list-none">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0 mt-2" />
                     <span><strong className="text-gray-900">{name}</strong> — {role}</span>
                   </li>
@@ -123,14 +122,14 @@ export default function PrivacyPage() {
             <Trash2 className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" />
             <div>
               <h2 className="text-base font-semibold text-gray-900 mb-2">Your rights</h2>
-              <ul className="space-y-2 list-none">
+              <ul className="space-y-2">
                 {[
                   ["Access", "You can view all your data at any time within the application."],
                   ["Correction", "You can edit your name, currency, and any financial data you've entered."],
                   ["Deletion", "You can permanently delete your account and all associated data from Settings → Profile → Delete Account. Deletion is immediate and irreversible."],
                   ["Data portability", "You can export your transaction history as a CSV from the Reports page at any time."],
                 ].map(([right, desc]) => (
-                  <li key={right as string} className="flex gap-2">
+                  <li key={right as string} className="flex gap-2 list-none">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0 mt-2" />
                     <span><strong className="text-gray-900">{right}:</strong> {desc}</span>
                   </li>
