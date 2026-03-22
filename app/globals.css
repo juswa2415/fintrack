@@ -71,7 +71,10 @@ main > * {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Scrollbar — gutter is always reserved (no content shift), thumb fades in/out */
+/* Scrollbar — gutter always reserved on scroll containers so content never shifts,
+   thumb is invisible at rest and fades in on hover.
+   IMPORTANT: scrollbar-gutter is scoped to [data-scroll] only, NOT applied
+   globally — a global * rule breaks fixed-size elements like avatar circles. */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
@@ -79,14 +82,18 @@ main > * {
   border-radius: 99px;
   transition: background 0.25s ease;
 }
-*:hover::-webkit-scrollbar-thumb { background: var(--border); }
-::-webkit-scrollbar-thumb:hover  { background: var(--text-muted); }
+[data-scroll]:hover::-webkit-scrollbar-thumb,
+main:hover::-webkit-scrollbar-thumb { background: var(--border); }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
-/* Reserve the gutter permanently so showing/hiding the thumb never shifts content */
-* { scrollbar-gutter: stable; }
-
-/* Firefox — always reserve gutter, use auto so it only shows when actually needed */
-* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
-*:hover { scrollbar-color: var(--border) transparent; }
+/* Reserve gutter only on actual scroll containers */
+main, [data-scroll] {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+main:hover, [data-scroll]:hover {
+  scrollbar-color: var(--border) transparent;
+}
 
 ::selection { background: var(--indigo-light); color: var(--indigo); }

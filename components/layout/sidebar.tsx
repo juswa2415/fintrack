@@ -130,32 +130,54 @@ function SidebarContent({ onClose, userName, userImage }: {
         })}
       </nav>
 
+      {/* Ko-fi support link */}
+      <div className="px-4 pb-3 flex-shrink-0">
+        <a
+          href="https://ko-fi.com/Y8Y61WGMQG"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block w-full rounded-xl overflow-hidden transition-all duration-150 hover:shadow-[0_2px_8px_0_rgba(0,0,0,0.12)] hover:opacity-90"
+          title="Support this project on Ko-fi"
+        >
+          <img
+            src="https://storage.ko-fi.com/cdn/kofi6.png?v=6"
+            alt="Buy Me a Coffee at ko-fi.com"
+            style={{ width: "75%", height: "auto", display: "block", border: "0px" }}
+          />
+        </a>
+      </div>
+
       {/* User card */}
-      <div
-        className="px-3 pb-4 flex-shrink-0"
-        style={{ borderTop: "1px solid var(--sidebar-border)" }}
-      >
+      <div className="px-3 pb-4 flex-shrink-0" style={{ borderTop: "1px solid var(--sidebar-border)" }}>
         <div className="flex items-center gap-3 px-3 py-3 rounded-xl mt-3">
+          {/* Avatar */}
           <div
-            className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center"
-            style={{ background: "var(--border)" }}
+            className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-[#E6E4DF]"
+            style={{ minWidth: "2rem", minHeight: "2rem" }}
           >
             {userImage ? (
-              <img src={userImage} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <img
+                src={userImage}
+                alt=""
+                width={32}
+                height={32}
+                className="w-8 h-8 rounded-full object-cover"
+                referrerPolicy="no-referrer"
+              />
             ) : (
-              <span className="text-[12px] font-semibold" style={{ color: "var(--text-secondary)" }}>
+              <span className="text-[12px] font-semibold text-[#6B6860]">
                 {userName?.[0]?.toUpperCase() ?? "U"}
               </span>
             )}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[12px] font-medium text-[#141414] truncate">{userName}</p>
-            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Personal</p>
+            <p className="text-[10px] text-[#A8A49E]">Personal</p>
           </div>
+          {/* Sign out — no inline style so hover:text-red-600 can take effect */}
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="p-1.5 rounded-lg transition-colors flex-shrink-0"
-            style={{ color: "var(--text-muted)" }}
+            className="p-1.5 rounded-lg transition-colors flex-shrink-0 text-[#A8A49E] hover:bg-red-50 hover:text-red-600"
             title="Sign out"
           >
             <LogOut className="h-3.5 w-3.5" />
