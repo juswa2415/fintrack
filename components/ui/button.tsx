@@ -10,18 +10,18 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 const variants = {
-  default: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm",
-  outline: "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
-  ghost: "text-gray-700 hover:bg-gray-100",
-  destructive: "bg-red-600 text-white hover:bg-red-700 shadow-sm",
-  secondary: "bg-gray-100 text-gray-900 hover:bg-gray-200",
+  default:     "bg-[#141414] text-white hover:bg-[#2a2a2a] active:bg-[#0a0a0a]",
+  outline:     "border border-[#E6E4DF] bg-white text-[#141414] hover:bg-[#F4F3F0]",
+  ghost:       "text-[#6B6860] hover:bg-[#F4F3F0] hover:text-[#141414]",
+  destructive: "bg-red-600 text-white hover:bg-red-700",
+  secondary:   "bg-[#F4F3F0] text-[#141414] hover:bg-[#ECEAE5] border border-[#E6E4DF]",
 };
 
 const sizes = {
-  default: "h-9 px-4 py-2 text-sm",
-  sm: "h-8 px-3 text-xs",
-  lg: "h-11 px-8 text-base",
-  icon: "h-9 w-9",
+  default: "h-9 px-4 py-2 text-[13px]",
+  sm:      "h-7 px-3 text-[12px]",
+  lg:      "h-10 px-5 text-sm",
+  icon:    "h-8 w-8",
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -31,7 +31,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={cn(
-          "inline-flex items-center justify-center rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 disabled:pointer-events-none cursor-pointer",
+          "inline-flex items-center justify-center rounded-xl font-medium transition-all duration-150",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#141414]/20",
+          "disabled:opacity-40 disabled:pointer-events-none cursor-pointer",
+          "tracking-[-0.01em]",
           variants[variant],
           sizes[size],
           className
@@ -40,15 +43,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading ? (
           <span className="flex items-center gap-2">
-            <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
             {children}
           </span>
-        ) : (
-          children
-        )}
+        ) : children}
       </button>
     );
   }

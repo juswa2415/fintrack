@@ -7,3 +7,86 @@
 html, body {
   height: 100%;
 }
+
+:root {
+  /* Canvas — the warm gray outer shell the whole app sits on */
+  --bg:          #E8E6E1;
+
+  /* Surfaces */
+  --surface:     #FFFFFF;
+  --surface-2:   #FAFAF8;
+  --border:      #E6E4DF;
+  --border-2:    #EEEDE9;
+
+  /* Text */
+  --text-primary:   #141414;
+  --text-secondary: #6B6860;
+  --text-muted:     #A8A49E;
+
+  /* Accent */
+  --accent:         #1A1A1A;
+  --accent-light:   #F0EFE9;
+
+  /* Semantic colours */
+  --green:          #16A34A;
+  --green-light:    #DCFCE7;
+  --red:            #DC2626;
+  --red-light:      #FEE2E2;
+  --amber:          #D97706;
+  --amber-light:    #FEF3C7;
+  --indigo:         #4F46E5;
+  --indigo-light:   #EEF2FF;
+
+  /* Sidebar — same colour as the canvas so they blend seamlessly */
+  --sidebar-bg:          #E8E6E1;
+  --sidebar-border:      transparent;
+  --sidebar-active:      rgba(0,0,0,0.07);
+  --sidebar-text:        #6B6860;
+  --sidebar-active-text: #141414;
+
+  /* Content card — the white floating area */
+  --content-bg:          #FFFFFF;
+  --content-radius:      16px;
+  --content-shadow:      0 2px 16px 0 rgba(0,0,0,0.07), 0 1px 3px 0 rgba(0,0,0,0.06);
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+main > * {
+  animation: fadeUp 0.18s ease both;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Scrollbar — gutter is always reserved (no content shift), thumb fades in/out */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 99px;
+  transition: background 0.25s ease;
+}
+*:hover::-webkit-scrollbar-thumb { background: var(--border); }
+::-webkit-scrollbar-thumb:hover  { background: var(--text-muted); }
+
+/* Reserve the gutter permanently so showing/hiding the thumb never shifts content */
+* { scrollbar-gutter: stable; }
+
+/* Firefox — always reserve gutter, use auto so it only shows when actually needed */
+* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+*:hover { scrollbar-color: var(--border) transparent; }
+
+::selection { background: var(--indigo-light); color: var(--indigo); }

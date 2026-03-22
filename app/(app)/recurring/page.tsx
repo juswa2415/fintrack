@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useCurrency } from "@/lib/use-currency";
 import { formatCurrency } from "@/lib/utils";
+import { getDueStatusFull, type DueStatus } from "@/lib/recurring";
 import {
   Plus, Trash2, CheckCircle2, Clock, Pencil,
   AlertCircle, TrendingUp, TrendingDown,
@@ -35,126 +36,97 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const FREQUENCIES = [
-  { value: "DAILY", label: "Daily" },
-  { value: "WEEKLY", label: "Weekly" },
+  { value: "DAILY",   label: "Daily" },
+  { value: "WEEKLY",  label: "Weekly" },
   { value: "MONTHLY", label: "Monthly" },
-  { value: "YEARLY", label: "Yearly" },
+  { value: "YEARLY",  label: "Yearly" },
 ];
-
-function getDueStatus(item: Recurring): "overdue" | "due-soon" | "logged-period" | "upcoming" {
-  const now = new Date();
-  const lastLogged = item.lastLogged ? new Date(item.lastLogged) : null;
-  const startDate = new Date(item.startDate);
-
-  if (lastLogged) {
-    const alreadyLogged = (() => {
-      switch (item.frequency) {
-        case "DAILY": return lastLogged.toDateString() === now.toDateString();
-        case "WEEKLY": return Math.floor((now.getTime() - lastLogged.getTime()) / 86400000) < 7;
-        case "MONTHLY": return lastLogged.getMonth() === now.getMonth() && lastLogged.getFullYear() === now.getFullYear();
-        case "YEARLY": return lastLogged.getFullYear() === now.getFullYear();
-        default: return false;
-      }
-    })();
-    if (alreadyLogged) return "logged-period";
-  }
-
-  if (startDate > now) {
-    const daysUntil = Math.floor((startDate.getTime() - now.getTime()) / 86400000);
-    return daysUntil <= 3 ? "due-soon" : "upcoming";
-  }
-
-  if (!lastLogged) return "overdue";
-  const periodDays = { DAILY: 1, WEEKLY: 7, MONTHLY: 30, YEARLY: 365 }[item.frequency] ?? 30;
-  const daysSince = Math.floor((now.getTime() - lastLogged.getTime()) / 86400000);
-  if (daysSince >= periodDays) return "overdue";
-  if (daysSince >= periodDays - 3) return "due-soon";
-  return "upcoming";
-}
 
 function getLoggedLabel(type: string) { return type === "INCOME" ? "Received ✓" : "Paid ✓"; }
 function getActionLabel(type: string) { return type === "INCOME" ? "Record Income" : "Mark as Paid"; }
+
+// Badge colours / icons
+function statusBadge(status: DueStatus, type: string) {
+  switch (status) {
+    case "overdue":      return { icon: <AlertCircle className="h-3 w-3" />, label: "Overdue",       cls: "bg-red-50 text-red-600" };
+    case "due-soon":     return { icon: <Clock className="h-3 w-3" />,       label: "Due soon",      cls: "bg-amber-50 text-amber-600" };
+    case "logged-period": return { icon: <CheckCircle2 className="h-3 w-3" />, label: getLoggedLabel(type), cls: "bg-green-50 text-green-600" };
+    default:             return { icon: <Clock className="h-3 w-3" />,       label: "Upcoming",      cls: "bg-[#F4F3F0] text-[#6B6860]" };
+  }
+}
 
 // Single recurring item card — reused in both sections
 function RecurringItem({
   item, currency, loggingId, onLog, onEdit, onDelete,
 }: {
-  item: Recurring; currency: string; loggingId: string | null;
+  item: Recurring;
+  currency: string;
+  loggingId: string | null;
   onLog: (item: Recurring) => void;
   onEdit: (item: Recurring) => void;
-  onDelete: (id: string) => void;
+  onDelete: (item: Recurring) => void;
 }) {
-  const status = getDueStatus(item);
-  return (
-    <Card className={status === "overdue" ? "border-red-200" : status === "due-soon" ? "border-amber-200" : ""}>
-      <CardContent className="flex items-center justify-between py-3.5 gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-            style={{ backgroundColor: item.category.color }}>
-            {item.category.name[0]}
-          </span>
-          <div className="min-w-0">
-            <p className="font-medium text-gray-900 truncate text-sm">{item.description || item.category.name}</p>
-            <p className="text-xs text-gray-500">
-              {item.category.name} · {item.frequency.charAt(0) + item.frequency.slice(1).toLowerCase()}
-            </p>
-            <div className="flex items-center gap-2 mt-0.5">
-              {status === "logged-period" && (
-                <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
-                  <CheckCircle2 className="h-3 w-3" />
-                  {item.type === "INCOME" ? "Received" : "Paid"}{" "}
-                  {item.lastLogged ? new Date(item.lastLogged).toLocaleDateString() : ""}
-                </span>
-              )}
-              {status === "overdue" && (
-                <span className="inline-flex items-center gap-1 text-xs text-red-600 font-medium">
-                  <AlertCircle className="h-3 w-3" /> Overdue
-                </span>
-              )}
-              {status === "due-soon" && (
-                <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-medium">
-                  <Clock className="h-3 w-3" /> Due soon
-                </span>
-              )}
-              {status === "upcoming" && item.lastLogged && (
-                <span className="text-xs text-gray-400">Last: {new Date(item.lastLogged).toLocaleDateString()}</span>
-              )}
-            </div>
-          </div>
-        </div>
+  const status = getDueStatusFull(item.frequency, item.lastLogged, item.startDate);
+  const badge  = statusBadge(status, item.type);
+  const isIncome = item.type === "INCOME";
 
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className={`text-sm font-bold ${item.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
-            {item.type === "INCOME" ? "+" : "-"}{formatCurrency(item.amount, currency)}
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-[#FAFAF8] transition-colors group">
+      {/* Color dot + icon */}
+      <div
+        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-white text-[11px] font-bold"
+        style={{ backgroundColor: item.category.color }}
+      >
+        {item.category.name[0]}
+      </div>
+
+      {/* Main info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-[13px] font-medium text-[#141414] truncate">
+            {item.description || item.category.name}
+          </p>
+          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${badge.cls}`}>
+            {badge.icon}{badge.label}
           </span>
-          <button
-            onClick={() => onLog(item)}
-            disabled={loggingId === item.id}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
-              status === "logged-period"
-                ? "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
-                : status === "overdue"
-                ? "bg-red-600 text-white hover:bg-red-700"
-                : status === "due-soon"
-                ? "bg-amber-500 text-white hover:bg-amber-600"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            {status === "logged-period"
-              ? <><CheckCircle2 className="h-3.5 w-3.5" /> {getLoggedLabel(item.type)}</>
-              : getActionLabel(item.type)}
-          </button>
-          <button onClick={() => onEdit(item)}
-            className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={() => onDelete(item.id)}
-            className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
         </div>
-      </CardContent>
-    </Card>
+        <p className="text-[11px] text-[#A8A49E] mt-0.5">
+          {item.frequency.charAt(0) + item.frequency.slice(1).toLowerCase()} · {item.category.name}
+        </p>
+      </div>
+
+      {/* Amount */}
+      <p className={`text-[14px] font-semibold tabular-nums flex-shrink-0 ${isIncome ? "text-[#16A34A]" : "text-[#141414]"}`}>
+        {isIncome ? "+" : "-"}{formatCurrency(item.amount, currency)}
+      </p>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {status !== "logged-period" && (
+          <Button
+            size="sm"
+            variant={isIncome ? "outline" : "default"}
+            loading={loggingId === item.id}
+            onClick={() => onLog(item)}
+            className="text-[11px]"
+          >
+            {getActionLabel(item.type)}
+          </Button>
+        )}
+        <button
+          onClick={() => onEdit(item)}
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-[#A8A49E] hover:text-[#141414] hover:bg-[#F4F3F0] transition-colors"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={() => onDelete(item)}
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-[#A8A49E] hover:text-red-600 hover:bg-red-50 transition-colors"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -164,343 +136,307 @@ export default function RecurringPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<Recurring | null>(null);
-  const [originalStartDate, setOriginalStartDate] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<Recurring | null>(null);
   const [loggingId, setLoggingId] = useState<string | null>(null);
-  const [confirmItem, setConfirmItem] = useState<Recurring | null>(null);
-  const [missedPayment, setMissedPayment] = useState<MissedPaymentInfo | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [missedInfo, setMissedInfo] = useState<MissedPaymentInfo | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { type: "EXPENSE", frequency: "MONTHLY", startDate: new Date().toISOString().split("T")[0] },
   });
   const selectedType = watch("type");
-  const currentStartDate = watch("startDate");
+
+  const addToast = (message: string) => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts((t) => [...t, { id, message }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3000);
+  };
 
   const fetchData = useCallback(async () => {
-    const [r, c] = await Promise.all([fetch("/api/recurring"), fetch("/api/categories")]);
-    setItems(await r.json());
-    setCategories(await c.json());
+    const [rRes, cRes] = await Promise.all([fetch("/api/recurring"), fetch("/api/categories")]);
+    setItems(await rRes.json());
+    setCategories(await cRes.json());
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const addToast = (message: string) => {
-    const id = Math.random().toString(36).slice(2);
-    setToasts((prev) => [...prev, { id, message }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+  const openAdd = () => {
+    reset({ type: "EXPENSE", frequency: "MONTHLY", startDate: new Date().toISOString().split("T")[0] });
+    setEditItem(null);
+    setModalOpen(true);
   };
 
-  const doLog = async (item: Recurring, force = false, paymentDates?: string[]) => {
-    setLoggingId(item.id);
-    const body: any = { force };
-    if (paymentDates) body.paymentDates = paymentDates;
-
-    const res = await fetch(`/api/recurring/${item.id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+  const openEdit = (item: Recurring) => {
+    setEditItem(item);
+    reset({
+      categoryId:  item.category.id,
+      amount:      item.amount,
+      type:        item.type as "INCOME" | "EXPENSE",
+      frequency:   item.frequency as FormData["frequency"],
+      startDate:   item.startDate.split("T")[0],
+      description: item.description ?? "",
     });
-
-    if (res.status === 409) { setConfirmItem(item); setLoggingId(null); return; }
-    if (res.status === 202) {
-      const data = await res.json();
-      setMissedPayment({ item, missedDates: data.missedDates, selectedCount: data.count });
-      setLoggingId(null);
-      return;
-    }
-    if (res.ok) {
-      const count = paymentDates?.length ?? 1;
-      const verb = item.type === "INCOME" ? "Income recorded" : "Payment recorded";
-      addToast(`${verb} — ${count > 1 ? `${count} payments` : formatCurrency(item.amount, currency)} for ${item.description || item.category.name}`);
-      fetchData();
-    }
-    setLoggingId(null);
+    setModalOpen(true);
   };
 
   const onSubmit = async (data: FormData) => {
-    if (editItem) {
-      const startDateChanged = data.startDate !== originalStartDate;
-      const newStartEarlier = startDateChanged && new Date(data.startDate) < new Date(originalStartDate);
-      await fetch(`/api/recurring/${editItem.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, resetLastLogged: newStartEarlier }),
-      });
-      setEditItem(null);
-    } else {
-      await fetch("/api/recurring", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-    }
+    const url    = editItem ? `/api/recurring/${editItem.id}` : "/api/recurring";
+    const method = editItem ? "PUT" : "POST";
+    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
     setModalOpen(false);
     reset();
     fetchData();
   };
 
-  const openEdit = (item: Recurring) => {
-    setEditItem(item);
-    setOriginalStartDate(new Date(item.startDate).toISOString().split("T")[0]);
-    setValue("categoryId", item.category.id);
-    setValue("amount", item.amount);
-    setValue("type", item.type as "INCOME" | "EXPENSE");
-    setValue("frequency", item.frequency as any);
-    setValue("startDate", new Date(item.startDate).toISOString().split("T")[0]);
-    setValue("description", item.description ?? "");
-    setModalOpen(true);
+  const handleLog = async (item: Recurring) => {
+    setLoggingId(item.id);
+    try {
+      const res  = await fetch(`/api/recurring/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "log" }) });
+      const data = await res.json();
+      if (data.missedDates?.length) {
+        setMissedInfo({ item, missedDates: data.missedDates, selectedCount: data.missedDates.length });
+      } else {
+        addToast(item.type === "INCOME" ? "Income recorded ✓" : "Marked as paid ✓");
+        fetchData();
+      }
+    } finally {
+      setLoggingId(null);
+    }
   };
 
-  const deleteItem = async (id: string) => {
-    if (!confirm("Remove this recurring transaction?")) return;
-    await fetch(`/api/recurring/${id}`, { method: "DELETE" });
+  const handleLogMissed = async () => {
+    if (!missedInfo) return;
+    await fetch(`/api/recurring/${missedInfo.item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "logMissed", count: missedInfo.selectedCount }),
+    });
+    setMissedInfo(null);
+    addToast(`Logged ${missedInfo.selectedCount} missed payment${missedInfo.selectedCount > 1 ? "s" : ""} ✓`);
     fetchData();
   };
 
-  const filteredCats = categories.filter((c) => !selectedType || c.type === selectedType);
-  const startDateMovedEarlier = editItem && currentStartDate && new Date(currentStartDate) < new Date(originalStartDate);
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    await fetch(`/api/recurring/${deleteTarget.id}`, { method: "DELETE" });
+    setDeleteTarget(null);
+    fetchData();
+  };
 
-  const incomeItems = items.filter((i) => i.type === "INCOME");
+  const incomeItems  = items.filter((i) => i.type === "INCOME");
   const expenseItems = items.filter((i) => i.type === "EXPENSE");
 
-  const totalMonthlyIncome = incomeItems.reduce((s, i) => s + (i.frequency === "MONTHLY" ? i.amount : 0), 0);
-  const totalMonthlyExpense = expenseItems.reduce((s, i) => s + (i.frequency === "MONTHLY" ? i.amount : 0), 0);
+  const sectionTotal = (list: Recurring[]) => list.reduce((s, i) => s + i.amount, 0);
 
-  const sharedProps = { currency, loggingId, onLog: doLog, onEdit: openEdit, onDelete: deleteItem };
+  const filteredCategories = categories.filter((c) => c.type === selectedType || c.type === "INCOME");
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <div className="w-5 h-5 border-2 border-[#141414] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Toasts */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
-        {toasts.map((t) => (
-          <div key={t.id} className="pointer-events-auto flex items-center gap-3 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-lg text-sm max-w-sm">
-            <CheckCircle2 className="h-4 w-4 text-green-400 flex-shrink-0" />
-            <span>{t.message}</span>
-          </div>
-        ))}
-      </div>
 
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Recurring Transactions</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage automatic income and expenses</p>
+          <h1 className="text-[22px] font-semibold text-[#141414] tracking-[-0.03em]">Recurring</h1>
+          <p className="text-[13px] text-[#A8A49E] mt-0.5">Manage scheduled income and expenses</p>
         </div>
-        <Button onClick={() => { setEditItem(null); reset(); setModalOpen(true); }}>
-          <Plus className="h-4 w-4 mr-1.5" /> Add Recurring
+        <Button onClick={openAdd}>
+          <Plus className="h-4 w-4 mr-1.5" /> Add recurring
         </Button>
       </div>
 
-      {loading ? (
-        <p className="text-center py-12 text-gray-400">Loading...</p>
-      ) : items.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <p className="text-sm">No recurring transactions yet.</p>
-          <p className="text-xs mt-1">Add your regular income and bills to track them here.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Two-column split: Income | Expense — stretch to fill page */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 
-          {/* Income section */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
+        {/* Income column */}
+        <Card>
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#EEEDE9]">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-green-100 flex items-center justify-center">
-                  <TrendingUp className="h-3.5 w-3.5 text-green-600" />
-                </div>
-                <h2 className="text-sm font-semibold text-gray-900">Income</h2>
-                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{incomeItems.length}</span>
-              </div>
-              {totalMonthlyIncome > 0 && (
-                <span className="text-xs font-semibold text-green-600">
-                  +{formatCurrency(totalMonthlyIncome, currency)}/mo
+                <TrendingUp className="h-4 w-4 text-[#16A34A]" />
+                <p className="text-[13px] font-semibold text-[#141414]">Income</p>
+                <span className="text-[10px] bg-[#F4F3F0] text-[#6B6860] px-1.5 py-0.5 rounded-full font-medium">
+                  {incomeItems.length}
                 </span>
-              )}
-            </div>
-
-            {incomeItems.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-xl">
-                No recurring income added yet
               </div>
-            ) : (
-              <div className="space-y-2">
-                {incomeItems.map((item) => (
-                  <RecurringItem key={item.id} item={item} {...sharedProps} />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Expense section */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-red-100 flex items-center justify-center">
-                  <TrendingDown className="h-3.5 w-3.5 text-red-500" />
-                </div>
-                <h2 className="text-sm font-semibold text-gray-900">Expenses</h2>
-                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{expenseItems.length}</span>
-              </div>
-              {totalMonthlyExpense > 0 && (
-                <span className="text-xs font-semibold text-red-500">
-                  -{formatCurrency(totalMonthlyExpense, currency)}/mo
-                </span>
-              )}
-            </div>
-
-            {expenseItems.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-xl">
-                No recurring expenses added yet
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {expenseItems.map((item) => (
-                  <RecurringItem key={item.id} item={item} {...sharedProps} />
-                ))}
-              </div>
-            )}
-          </div>
-
-        </div>
-      )}
-
-      {/* Double-log confirmation */}
-      <Modal open={!!confirmItem} onClose={() => setConfirmItem(null)} title="Already logged this period">
-        {confirmItem && (
-          <div className="space-y-4">
-            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
-              <p className="text-sm text-amber-800 font-medium">
-                You already {confirmItem.type === "INCOME" ? "recorded income" : "logged a payment"} for{" "}
-                <span className="font-bold">{confirmItem.description || confirmItem.category.name}</span>{" "}
-                on {confirmItem.lastLogged ? new Date(confirmItem.lastLogged).toLocaleDateString() : "a previous date"}.
+              <p className="text-[12px] font-semibold text-[#16A34A] tabular-nums">
+                +{formatCurrency(sectionTotal(incomeItems), currency)}
               </p>
             </div>
-            <p className="text-sm text-gray-600">Log another {confirmItem.type === "INCOME" ? "income entry" : "payment"}? Only do this for a genuine second transaction.</p>
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setConfirmItem(null)}>Cancel</Button>
-              <Button variant="destructive" className="flex-1"
-                onClick={() => { const i = confirmItem; setConfirmItem(null); doLog(i, true); }}>
-                Log Again
-              </Button>
+            {incomeItems.length === 0 ? (
+              <p className="text-[12px] text-[#A8A49E] text-center py-8">No recurring income yet</p>
+            ) : (
+              <div className="p-2">
+                {incomeItems.map((item) => (
+                  <RecurringItem
+                    key={item.id} item={item} currency={currency}
+                    loggingId={loggingId} onLog={handleLog} onEdit={openEdit} onDelete={setDeleteTarget}
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Expense column */}
+        <Card>
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#EEEDE9]">
+              <div className="flex items-center gap-2">
+                <TrendingDown className="h-4 w-4 text-[#DC2626]" />
+                <p className="text-[13px] font-semibold text-[#141414]">Expenses</p>
+                <span className="text-[10px] bg-[#F4F3F0] text-[#6B6860] px-1.5 py-0.5 rounded-full font-medium">
+                  {expenseItems.length}
+                </span>
+              </div>
+              <p className="text-[12px] font-semibold text-[#DC2626] tabular-nums">
+                -{formatCurrency(sectionTotal(expenseItems), currency)}
+              </p>
             </div>
-          </div>
-        )}
-      </Modal>
+            {expenseItems.length === 0 ? (
+              <p className="text-[12px] text-[#A8A49E] text-center py-8">No recurring expenses yet</p>
+            ) : (
+              <div className="p-2">
+                {expenseItems.map((item) => (
+                  <RecurringItem
+                    key={item.id} item={item} currency={currency}
+                    loggingId={loggingId} onLog={handleLog} onEdit={openEdit} onDelete={setDeleteTarget}
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Missed payments modal */}
-      <Modal open={!!missedPayment} onClose={() => setMissedPayment(null)} title="Missed Payments Detected">
-        {missedPayment && (
-          <MissedPaymentsModal
-            info={missedPayment} currency={currency}
-            onConfirm={(dates) => { const item = missedPayment.item; setMissedPayment(null); doLog(item, true, dates); }}
-            onCancel={() => setMissedPayment(null)}
-          />
-        )}
-      </Modal>
-
-      {/* Add/Edit modal */}
-      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditItem(null); reset(); }}
-        title={editItem ? "Edit Recurring Transaction" : "Add Recurring Transaction"}>
+      {/* Add / Edit modal */}
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editItem ? "Edit recurring" : "Add recurring"}
+      >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="flex gap-2">
-            {(["INCOME", "EXPENSE"] as const).map((t) => (
-              <button key={t} type="button"
-                onClick={() => { setValue("type", t); setValue("categoryId", ""); }}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                  selectedType === t
-                    ? t === "INCOME" ? "bg-green-600 text-white border-green-600" : "bg-red-600 text-white border-red-600"
-                    : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-                }`}>{t === "INCOME" ? "Income" : "Expense"}</button>
-            ))}
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Category</label>
-            <select {...register("categoryId")}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              <option value="">Select category</option>
-              {filteredCats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            {errors.categoryId && <p className="text-xs text-red-600">{errors.categoryId.message}</p>}
-          </div>
-          <Input label="Amount" type="number" step="0.01"
-            {...register("amount", { valueAsNumber: true })} error={errors.amount?.message} />
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Frequency</label>
-            <select {...register("frequency")}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              {FREQUENCIES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-            </select>
-          </div>
-          <Input label="Start Date" type="date" {...register("startDate")} />
-          {startDateMovedEarlier && (
-            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
-              ⚠️ Moving start date earlier will reset payment history so missed periods are detected correctly.
+          {/* Type toggle */}
+          <div>
+            <label className="text-[12px] font-medium text-[#6B6860] mb-1.5 block">Type</label>
+            <div className="flex rounded-xl overflow-hidden border border-[#E6E4DF]">
+              {(["EXPENSE", "INCOME"] as const).map((t) => (
+                <button key={t} type="button" onClick={() => setValue("type", t)}
+                  className={`flex-1 py-2 text-[13px] font-medium transition-colors ${selectedType === t ? (t === "INCOME" ? "bg-[#DCFCE7] text-[#16A34A]" : "bg-[#141414] text-white") : "bg-white text-[#6B6860] hover:bg-[#F4F3F0]"}`}>
+                  {t === "INCOME" ? "Income" : "Expense"}
+                </button>
+              ))}
             </div>
-          )}
-          <Input label="Description (optional)" placeholder="e.g. Monthly electricity bill" {...register("description")} />
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" className="flex-1"
-              onClick={() => { setModalOpen(false); setEditItem(null); reset(); }}>Cancel</Button>
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="text-[12px] font-medium text-[#6B6860] mb-1.5 block">Category</label>
+            <select {...register("categoryId")}
+              className="w-full h-9 px-3 rounded-xl border border-[#E6E4DF] bg-white text-[13px] text-[#141414] focus:outline-none focus:ring-2 focus:ring-[#141414]/10">
+              <option value="">Select category</option>
+              {categories.filter((c) => c.type === selectedType).map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {errors.categoryId && <p className="text-[11px] text-red-500 mt-1">{errors.categoryId.message}</p>}
+          </div>
+
+          {/* Amount */}
+          <div>
+            <label className="text-[12px] font-medium text-[#6B6860] mb-1.5 block">Amount</label>
+            <Input
+              type="number" step="0.01" placeholder="0.00"
+              {...register("amount", { valueAsNumber: true })}
+            />
+            {errors.amount && <p className="text-[11px] text-red-500 mt-1">{errors.amount.message}</p>}
+          </div>
+
+          {/* Frequency */}
+          <div>
+            <label className="text-[12px] font-medium text-[#6B6860] mb-1.5 block">Frequency</label>
+            <select {...register("frequency")}
+              className="w-full h-9 px-3 rounded-xl border border-[#E6E4DF] bg-white text-[13px] text-[#141414] focus:outline-none focus:ring-2 focus:ring-[#141414]/10">
+              {FREQUENCIES.map((f) => (
+                <option key={f.value} value={f.value}>{f.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Start date */}
+          <div>
+            <label className="text-[12px] font-medium text-[#6B6860] mb-1.5 block">Start date</label>
+            <Input type="date" {...register("startDate")} />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="text-[12px] font-medium text-[#6B6860] mb-1.5 block">Description (optional)</label>
+            <Input placeholder="e.g. Netflix, Electricity…" {...register("description")} />
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>Cancel</Button>
             <Button type="submit" className="flex-1" loading={isSubmitting}>
-              {editItem ? "Save Changes" : "Add Recurring"}
+              {editItem ? "Save changes" : "Add recurring"}
             </Button>
           </div>
         </form>
       </Modal>
-    </div>
-  );
-}
 
-function MissedPaymentsModal({ info, currency, onConfirm, onCancel }: {
-  info: MissedPaymentInfo; currency: string;
-  onConfirm: (dates: string[]) => void; onCancel: () => void;
-}) {
-  const [count, setCount] = useState(info.missedDates.length);
-  const selectedDates = info.missedDates.slice(0, count);
-  const total = info.item.amount * count;
-
-  return (
-    <div className="space-y-4">
-      <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
-        <p className="text-sm font-medium text-amber-800">
-          <span className="font-bold">{info.item.description || info.item.category.name}</span> has{" "}
-          {info.missedDates.length} missed {info.item.type === "INCOME" ? "income period" : "payment"}{info.missedDates.length > 1 ? "s" : ""}.
+      {/* Delete confirmation */}
+      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete recurring?">
+        <p className="text-[13px] text-[#6B6860] mb-4">
+          This will permanently remove <strong>{deleteTarget?.description || deleteTarget?.category.name}</strong> and all its logged transactions.
         </p>
-      </div>
-      <div className="flex items-center gap-3">
-        <label className="text-sm font-medium text-gray-700 flex-shrink-0">
-          {info.item.type === "INCOME" ? "Periods to record:" : "Payments to log:"}
-        </label>
-        <input type="number" min={1} max={info.missedDates.length} value={count}
-          onChange={(e) => setCount(Math.max(1, Math.min(info.missedDates.length, parseInt(e.target.value) || 1)))}
-          className="w-20 h-9 rounded-lg border border-gray-300 px-3 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <span className="text-xs text-gray-400">of {info.missedDates.length} max</span>
-      </div>
-      <div className="border border-gray-100 rounded-lg divide-y divide-gray-100 max-h-48 overflow-y-auto">
-        {selectedDates.map((d, i) => (
-          <div key={i} className="flex items-center justify-between px-4 py-2">
-            <span className="text-sm text-gray-700">
-              {new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-            </span>
-            <span className={`text-sm font-medium ${info.item.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
-              {info.item.type === "INCOME" ? "+" : "-"}{formatCurrency(info.item.amount, currency)}
-            </span>
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+          <Button variant="destructive" className="flex-1" onClick={handleDelete}>Delete</Button>
+        </div>
+      </Modal>
+
+      {/* Missed payments dialog */}
+      {missedInfo && (
+        <Modal open onClose={() => setMissedInfo(null)} title="Missed payments detected">
+          <p className="text-[13px] text-[#6B6860] mb-4">
+            We found <strong>{missedInfo.missedDates.length}</strong> missed period{missedInfo.missedDates.length > 1 ? "s" : ""} for <strong>{missedInfo.item.description || missedInfo.item.category.name}</strong>. How many would you like to log?
+          </p>
+          <div className="flex items-center gap-3 mb-4">
+            <Input
+              type="number" min={1} max={missedInfo.missedDates.length}
+              value={missedInfo.selectedCount}
+              onChange={(e) => setMissedInfo((m) => m ? { ...m, selectedCount: Math.min(m.missedDates.length, Math.max(1, parseInt(e.target.value) || 1)) } : m)}
+            />
+            <span className="text-[12px] text-[#A8A49E] whitespace-nowrap">of {missedInfo.missedDates.length}</span>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => { setMissedInfo(null); fetchData(); }}>
+              Just log current
+            </Button>
+            <Button className="flex-1" onClick={handleLogMissed}>
+              Log {missedInfo.selectedCount} payment{missedInfo.selectedCount > 1 ? "s" : ""}
+            </Button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Toast stack */}
+      <div className="fixed bottom-4 right-4 space-y-2 z-50">
+        {toasts.map((t) => (
+          <div key={t.id} className="bg-[#141414] text-white text-[12px] font-medium px-4 py-2.5 rounded-xl shadow-lg animate-in slide-in-from-bottom-2">
+            {t.message}
           </div>
         ))}
-      </div>
-      <div className="flex items-center justify-between px-1">
-        <span className="text-sm text-gray-500">Total</span>
-        <span className={`text-base font-bold ${info.item.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
-          {info.item.type === "INCOME" ? "+" : "-"}{formatCurrency(total, currency)}
-        </span>
-      </div>
-      <div className="flex gap-2 pt-2">
-        <Button variant="outline" className="flex-1" onClick={onCancel}>Cancel</Button>
-        <Button className="flex-1" onClick={() => onConfirm(selectedDates)}>
-          {info.item.type === "INCOME" ? `Record ${count} Period${count > 1 ? "s" : ""}` : `Log ${count} Payment${count > 1 ? "s" : ""}`}
-        </Button>
       </div>
     </div>
   );

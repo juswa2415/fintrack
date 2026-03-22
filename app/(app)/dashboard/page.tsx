@@ -2,9 +2,16 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/session";
 import { formatCurrency } from "@/lib/utils";
 import { DashboardCharts } from "./charts";
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, Target, CheckCircle2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CheckCircle2, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import Link from "next/link";
+
+function getGreeting(name: string): string {
+  const h = new Date().getHours();
+  const first = name.split(" ")[0];
+  if (h < 12) return `Good morning, ${first} 👋`;
+  if (h < 17) return `Good afternoon, ${first} 👋`;
+  return `Good evening, ${first} 👋`;
+}
 
 export default async function DashboardPage() {
   const session = await requireAuth();
@@ -12,362 +19,364 @@ export default async function DashboardPage() {
     where: { id: session.user.id },
     select: { currency: true, name: true, hasSeenOnboarding: true },
   });
-  const currency = user?.currency ?? "USD";
+  const currency      = user?.currency ?? "USD";
   const showOnboarding = !user?.hasSeenOnboarding;
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const now           = new Date();
+  const monthStart    = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd      = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+  const lastMonthEnd  = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
   const [
-    monthTxGroups, lastMonthTxGroups,
-    recentTransactions, upcomingRecurring,
-    budgets, expenseCategories,
-    goals, totalIncome, totalExpense,
+    monthGroups, lastMonthGroups, recentTx,
+    budgets,
+    // FIX: No take:6 cap — fetch ALL expense categories for this month so budget
+    // calculations are never silently zero for categories outside the top 6.
+    allExpenseCats,
+    goals,
+    totalIncome, totalExpense,
   ] = await Promise.all([
-    prisma.transaction.groupBy({
-      by: ["type"],
-      where: { userId: session.user.id, date: { gte: monthStart, lte: monthEnd } },
-      _sum: { amount: true },
-    }),
-    prisma.transaction.groupBy({
-      by: ["type"],
-      where: { userId: session.user.id, date: { gte: lastMonthStart, lte: lastMonthEnd } },
-      _sum: { amount: true },
-    }),
-    prisma.transaction.findMany({
-      where: { userId: session.user.id },
-      include: { category: true },
-      orderBy: { date: "desc" },
-      take: 8,
-    }),
-    prisma.recurringTransaction.findMany({
-      where: { userId: session.user.id, isActive: true },
-      include: { category: true },
-      orderBy: { startDate: "asc" },
-      take: 5,
-    }),
-    prisma.budget.findMany({
-      where: { userId: session.user.id, month: now.getMonth() + 1, year: now.getFullYear() },
-      include: { category: true },
-    }),
+    prisma.transaction.groupBy({ by: ["type"], where: { userId: session.user.id, date: { gte: monthStart, lte: monthEnd } }, _sum: { amount: true } }),
+    prisma.transaction.groupBy({ by: ["type"], where: { userId: session.user.id, date: { gte: lastMonthStart, lte: lastMonthEnd } }, _sum: { amount: true } }),
+    prisma.transaction.findMany({ where: { userId: session.user.id }, include: { category: true }, orderBy: { date: "desc" }, take: 8 }),
+    prisma.budget.findMany({ where: { userId: session.user.id, month: now.getMonth() + 1, year: now.getFullYear() }, include: { category: true } }),
     prisma.transaction.groupBy({
       by: ["categoryId"],
       where: { userId: session.user.id, type: "EXPENSE", date: { gte: monthStart, lte: monthEnd } },
       _sum: { amount: true },
       orderBy: { _sum: { amount: "desc" } },
-      take: 5,
+      // Removed take:6 — budget widget needs the full picture
     }),
-    prisma.goal.findMany({
-      where: { userId: session.user.id },
-      include: { category: true },
-      orderBy: { createdAt: "desc" },
-      take: 4,
-    }),
-    prisma.transaction.aggregate({
-      where: { userId: session.user.id, type: "INCOME" },
-      _sum: { amount: true },
-    }),
-    prisma.transaction.aggregate({
-      where: { userId: session.user.id, type: "EXPENSE" },
-      _sum: { amount: true },
-    }),
+    prisma.goal.findMany({ where: { userId: session.user.id }, include: { category: true }, orderBy: { createdAt: "desc" }, take: 3 }),
+    prisma.transaction.aggregate({ where: { userId: session.user.id, type: "INCOME" },  _sum: { amount: true } }),
+    prisma.transaction.aggregate({ where: { userId: session.user.id, type: "EXPENSE" }, _sum: { amount: true } }),
   ]);
 
-  const sixMonthsData = await getSixMonthsData(session.user.id);
+  // Keep top-6 slice only for the pie chart (visual, not calculations)
+  const expenseCatsForPie = allExpenseCats.slice(0, 6);
 
-  const monthIncome = monthTxGroups.find((t) => t.type === "INCOME")?._sum.amount ?? 0;
-  const monthExpense = monthTxGroups.find((t) => t.type === "EXPENSE")?._sum.amount ?? 0;
-  const lastMonthIncome = lastMonthTxGroups.find((t) => t.type === "INCOME")?._sum.amount ?? 0;
-  const lastMonthExpense = lastMonthTxGroups.find((t) => t.type === "EXPENSE")?._sum.amount ?? 0;
-  const monthlySavings = monthIncome - monthExpense;
-  const savingsRate = monthIncome > 0 ? Math.round((monthlySavings / monthIncome) * 100) : 0;
-  const netWorth = (totalIncome._sum.amount ?? 0) - (totalExpense._sum.amount ?? 0);
+  const sixMonthsData = await getSixMonths(session.user.id);
 
-  const incomeChange = lastMonthIncome > 0 ? ((monthIncome - lastMonthIncome) / lastMonthIncome) * 100 : null;
-  const expenseChange = lastMonthExpense > 0 ? ((monthExpense - lastMonthExpense) / lastMonthExpense) * 100 : null;
+  const monthIncome  = monthGroups.find((t) => t.type === "INCOME")?._sum.amount  ?? 0;
+  const monthExpense = monthGroups.find((t) => t.type === "EXPENSE")?._sum.amount ?? 0;
+  const lastIncome   = lastMonthGroups.find((t) => t.type === "INCOME")?._sum.amount  ?? 0;
+  const lastExpense  = lastMonthGroups.find((t) => t.type === "EXPENSE")?._sum.amount ?? 0;
+  const savings      = monthIncome - monthExpense;
+  const savingsRate  = monthIncome > 0 ? Math.round((savings / monthIncome) * 100) : 0;
+  const netWorth     = (totalIncome._sum.amount ?? 0) - (totalExpense._sum.amount ?? 0);
 
-  const categoryMap = await prisma.category.findMany({ where: { userId: session.user.id } });
-  const catById = Object.fromEntries(categoryMap.map((c) => [c.id, c]));
+  const incomeChange  = lastIncome  > 0 ? ((monthIncome  - lastIncome)  / lastIncome)  * 100 : null;
+  const expenseChange = lastExpense > 0 ? ((monthExpense - lastExpense) / lastExpense) * 100 : null;
 
-  const pieData = expenseCategories.map((e) => ({
-    name: catById[e.categoryId]?.name ?? "Unknown",
+  const catMap  = await prisma.category.findMany({ where: { userId: session.user.id } });
+  const catById = Object.fromEntries(catMap.map((c) => [c.id, c]));
+
+  const pieData = expenseCatsForPie.map((e) => ({
+    name:  catById[e.categoryId]?.name  ?? "?",
     value: e._sum.amount ?? 0,
-    color: catById[e.categoryId]?.color ?? "#6366f1",
+    color: catById[e.categoryId]?.color ?? "#ccc",
   }));
 
-  const budgetData = budgets.map((b) => {
-    const spent = expenseCategories.find((e) => e.categoryId === b.categoryId)?._sum.amount ?? 0;
-    return { name: b.category.name, budget: b.amount, spent, color: b.category.color };
-  });
+  // FIX: build spendByCat from the FULL (uncapped) allExpenseCats list
+  const spendByCat = Object.fromEntries(allExpenseCats.map((e) => [e.categoryId, e._sum.amount ?? 0]));
+  const budgetData = budgets.map((b) => ({
+    name:   b.category.name,
+    budget: b.amount,
+    spent:  spendByCat[b.categoryId] ?? 0,   // was silently 0 if outside top-6
+    color:  b.category.color,
+  }));
 
-  const activeGoals = goals.filter((g) => !g.isCompleted);
-  const completedGoals = goals.filter((g) => g.isCompleted);
+  // FIX: serialise goals to plain objects so no Date instances reach the client component
+  const goalsForClient = goals.map((g) => ({
+    id:            g.id,
+    name:          g.name,
+    targetAmount:  g.targetAmount,
+    currentAmount: g.currentAmount,
+    isCompleted:   g.isCompleted,
+    deadline:      g.deadline ? g.deadline.toISOString() : null,
+    category: {
+      id:    g.category.id,
+      name:  g.category.name,
+      color: g.category.color,
+    },
+  }));
+
+  // FIX: serialise recentTx dates to ISO strings for the client
+  const recentTxForClient = recentTx.map((t) => ({
+    id:          t.id,
+    amount:      t.amount,
+    type:        t.type,
+    date:        t.date.toISOString(),
+    description: t.description,
+    category: {
+      id:    t.category.id,
+      name:  t.category.name,
+      color: t.category.color,
+    },
+  }));
+
+  const activeGoals    = goalsForClient.filter((g) => !g.isCompleted);
+  const completedGoals = goalsForClient.filter((g) =>  g.isCompleted);
 
   return (
-    <div className="space-y-6">
-      {/* Header — no alert banner here, notifications live in the bell */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {now.toLocaleString("en-US", { month: "long", year: "numeric" })} overview
-        </p>
+    <div className="space-y-6 max-w-[1400px]">
+
+      {/* Greeting header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-[22px] font-semibold text-[#141414] tracking-[-0.03em]">
+            {getGreeting(user?.name ?? "there")}
+          </h1>
+          <p className="text-[13px] text-[#A8A49E] mt-0.5">
+            {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+          </p>
+        </div>
       </div>
 
-      {/* Redesigned stat cards — taller, number as hero */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatCard
-          title="Net Worth"
-          value={formatCurrency(netWorth, currency)}
-          icon={<Wallet className="h-4 w-4" />}
-          accent="#6366f1"
-          bg="from-indigo-50 to-indigo-50/30"
-          valueColor="text-indigo-700"
-        />
-        <StatCard
-          title="Month Income"
-          value={formatCurrency(monthIncome, currency)}
-          icon={<TrendingUp className="h-4 w-4" />}
-          accent="#22c55e"
-          bg="from-green-50 to-green-50/30"
-          valueColor="text-green-700"
-          change={incomeChange}
-          changeLabel="vs last month"
-        />
-        <StatCard
-          title="Month Expenses"
-          value={formatCurrency(monthExpense, currency)}
-          icon={<TrendingDown className="h-4 w-4" />}
-          accent="#ef4444"
-          bg="from-red-50 to-red-50/30"
-          valueColor="text-red-600"
-          change={expenseChange}
-          changeLabel="vs last month"
-          invertChange
-        />
-        <StatCard
-          title="Monthly Savings"
-          value={formatCurrency(monthlySavings, currency)}
-          icon={<PiggyBank className="h-4 w-4" />}
-          accent="#8b5cf6"
-          bg="from-purple-50 to-purple-50/30"
-          valueColor={monthlySavings >= 0 ? "text-purple-700" : "text-red-600"}
-        />
+      {/* ASYMMETRIC LAYOUT — 3 columns left (hero) + 1 column right (insights) */}
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
 
-        {/* Savings rate card */}
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <div className={`px-5 pt-4 pb-5 h-full bg-gradient-to-br ${
-              savingsRate >= 20 ? "from-green-50 to-emerald-50/30"
-              : savingsRate >= 10 ? "from-amber-50 to-amber-50/30"
-              : "from-red-50 to-red-50/30"
-            }`}>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Savings Rate</p>
-                <div className="relative w-8 h-8 flex-shrink-0">
-                  <svg className="w-8 h-8 -rotate-90" viewBox="0 0 32 32">
-                    <circle cx="16" cy="16" r="13" fill="none" stroke="#e5e7eb" strokeWidth="3" />
-                    <circle cx="16" cy="16" r="13" fill="none"
-                      stroke={savingsRate >= 20 ? "#22c55e" : savingsRate >= 10 ? "#f59e0b" : "#ef4444"}
-                      strokeWidth="3"
-                      strokeDasharray={`${Math.max(0, Math.min(100, savingsRate)) * 0.817} 81.7`}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-gray-700">
-                    {savingsRate}%
-                  </span>
-                </div>
-              </div>
-              <p className={`text-2xl font-bold tracking-tight ${
-                savingsRate >= 20 ? "text-green-700"
-                : savingsRate >= 10 ? "text-amber-600"
-                : "text-red-600"
-              }`}>
-                {savingsRate >= 20 ? "Great 🎉" : savingsRate >= 10 ? "Fair" : savingsRate > 0 ? "Low" : "None"}
+        {/* ───── LEFT — 3 columns ───── */}
+        <div className="xl:col-span-3 space-y-4">
+
+          {/* Hero stat row */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+
+            {/* Net Worth — hero card, spans 2 cols on lg */}
+            <div className="lg:col-span-2 bg-[#141414] rounded-2xl p-5 text-white">
+              <p className="text-[11px] font-medium text-white/50 uppercase tracking-widest mb-3">Net Worth</p>
+              <p className="text-[32px] font-semibold tracking-[-0.04em] tabular-nums leading-none">
+                {formatCurrency(netWorth, currency)}
               </p>
-              <p className="text-xs text-gray-500 mt-1">{savingsRate}% of income saved</p>
+              <p className="text-[11px] text-white/40 mt-2">All-time balance</p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Charts */}
-      <DashboardCharts
-        sixMonthsData={sixMonthsData}
-        pieData={pieData}
-        budgetData={budgetData}
-        currency={currency}
-        showOnboarding={showOnboarding}
-      />
+            {/* Monthly savings */}
+            <div className="bg-white rounded-2xl border border-[#E6E4DF] p-5">
+              <p className="text-[11px] font-medium text-[#A8A49E] uppercase tracking-widest mb-3">Savings</p>
+              <p className={`text-[22px] font-semibold tracking-[-0.03em] tabular-nums leading-none ${savings >= 0 ? "text-[#141414]" : "text-[#DC2626]"}`}>
+                {formatCurrency(savings, currency)}
+              </p>
+              <div className="mt-2 flex items-center gap-1">
+                <span className={`text-[11px] font-medium ${savingsRate >= 20 ? "text-[#16A34A]" : savingsRate >= 10 ? "text-[#D97706]" : "text-[#DC2626]"}`}>
+                  {savingsRate}% rate
+                </span>
+              </div>
+            </div>
 
-      {/* Top expenses */}
-      {pieData.length > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Top Expenses This Month</CardTitle>
-            <Link href="/transactions" className="text-xs text-indigo-600 hover:underline">View all</Link>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {pieData.map((d, i) => {
-              const pct = Math.round((d.value / monthExpense) * 100);
-              return (
-                <div key={i}>
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-                      <span className="text-sm text-gray-700">{d.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-gray-400">{pct}%</span>
-                      <span className="text-sm font-semibold text-gray-800 w-24 text-right">{formatCurrency(d.value, currency)}</span>
-                    </div>
-                  </div>
-                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: d.color }} />
-                  </div>
+            {/* Income this month */}
+            <div className="bg-white rounded-2xl border border-[#E6E4DF] p-5">
+              <p className="text-[11px] font-medium text-[#A8A49E] uppercase tracking-widest mb-3">Income</p>
+              <p className="text-[22px] font-semibold tracking-[-0.03em] tabular-nums leading-none text-[#141414]">
+                {formatCurrency(monthIncome, currency)}
+              </p>
+              {incomeChange !== null && (
+                <div className={`mt-2 flex items-center gap-0.5 ${incomeChange >= 0 ? "text-[#16A34A]" : "text-[#DC2626]"}`}>
+                  {incomeChange >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                  <span className="text-[11px] font-medium">{Math.abs(incomeChange).toFixed(1)}% vs last month</span>
                 </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
+              )}
+            </div>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Goals */}
-        {goals.length > 0 && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-4 w-4" /> Savings Goals
-              </CardTitle>
-              <Link href="/goals" className="text-xs text-indigo-600 hover:underline">View all</Link>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {activeGoals.map((g) => {
-                const pct = Math.min((g.currentAmount / g.targetAmount) * 100, 100);
-                return (
-                  <div key={g.id}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-medium text-gray-800">{g.name}</span>
-                      <span className="text-xs text-gray-500">
-                        {formatCurrency(g.currentAmount, currency)} / {formatCurrency(g.targetAmount, currency)}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${pct}%` }} />
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">{pct.toFixed(0)}% complete</p>
-                  </div>
-                );
-              })}
-              {completedGoals.map((g) => (
-                <div key={g.id} className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-                  <span className="text-sm text-gray-400 line-through">{g.name}</span>
-                  <span className="text-xs text-green-600 font-medium ml-auto">Completed!</span>
+          {/* Expenses stat */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className="bg-white rounded-2xl border border-[#E6E4DF] p-5">
+              <p className="text-[11px] font-medium text-[#A8A49E] uppercase tracking-widest mb-3">Expenses</p>
+              <p className="text-[22px] font-semibold tracking-[-0.03em] tabular-nums leading-none text-[#141414]">
+                {formatCurrency(monthExpense, currency)}
+              </p>
+              {expenseChange !== null && (
+                <div className={`mt-2 flex items-center gap-0.5 ${expenseChange <= 0 ? "text-[#16A34A]" : "text-[#DC2626]"}`}>
+                  {expenseChange <= 0 ? <ArrowDownRight className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
+                  <span className="text-[11px] font-medium">{Math.abs(expenseChange).toFixed(1)}% vs last month</span>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+              )}
+            </div>
 
-        {/* Recent Transactions */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Recent Transactions</CardTitle>
-            <Link href="/transactions" className="text-xs text-indigo-600 hover:underline">View all</Link>
-          </CardHeader>
-          <CardContent className="p-0">
-            {recentTransactions.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-8">No transactions yet</p>
-            ) : (
-              <ul className="divide-y divide-gray-100">
-                {recentTransactions.map((t) => (
-                  <li key={t.id} className="flex items-center justify-between px-6 py-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                        style={{ backgroundColor: t.category.color }}>
-                        {t.category.name[0]}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{t.description || t.category.name}</p>
-                        <p className="text-xs text-gray-400">{new Date(t.date).toLocaleDateString()}</p>
+            {/* Top expense category cards — 2 mini cards */}
+            {pieData.slice(0, 2).map((d, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-[#E6E4DF] p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
+                  <p className="text-[11px] font-medium text-[#A8A49E] uppercase tracking-widest truncate">{d.name}</p>
+                </div>
+                <p className="text-[22px] font-semibold tracking-[-0.03em] tabular-nums leading-none text-[#141414]">
+                  {formatCurrency(d.value, currency)}
+                </p>
+                <p className="text-[11px] text-[#A8A49E] mt-2">
+                  {Math.round((d.value / monthExpense) * 100)}% of expenses
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Charts section — onboarding modal lives here (client component) */}
+          <DashboardCharts
+            sixMonthsData={sixMonthsData}
+            pieData={pieData}
+            budgetData={budgetData}
+            currency={currency}
+            showOnboarding={showOnboarding}
+          />
+        </div>
+
+        {/* ───── RIGHT — insight panel ───── */}
+        <div className="xl:col-span-1 space-y-4">
+
+          {/* Financial health gauge */}
+          <div className="bg-white rounded-2xl border border-[#E6E4DF] p-5">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[13px] font-semibold text-[#141414]">Financial Health</p>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${savingsRate >= 20 ? "bg-[#DCFCE7] text-[#16A34A]" : savingsRate >= 10 ? "bg-[#FEF3C7] text-[#D97706]" : "bg-[#FEE2E2] text-[#DC2626]"}`}>
+                {savingsRate >= 20 ? "On track" : savingsRate >= 10 ? "Fair" : "At risk"}
+              </span>
+            </div>
+
+            {/* Semicircle gauge */}
+            <div className="flex flex-col items-center py-2">
+              <svg viewBox="0 0 120 70" className="w-full max-w-[160px]">
+                <path d="M 10 65 A 50 50 0 0 1 110 65" fill="none" stroke="#F4F3F0" strokeWidth="10" strokeLinecap="round" />
+                <path d="M 10 65 A 50 50 0 0 1 110 65" fill="none"
+                  stroke={savingsRate >= 20 ? "#16A34A" : savingsRate >= 10 ? "#D97706" : "#DC2626"}
+                  strokeWidth="10" strokeLinecap="round"
+                  strokeDasharray={`${Math.min(savingsRate, 100) * 1.571} 157.1`}
+                />
+                <circle cx="60" cy="65" r="4" fill={savingsRate >= 20 ? "#16A34A" : savingsRate >= 10 ? "#D97706" : "#DC2626"} />
+              </svg>
+              <p className="text-[28px] font-semibold tracking-[-0.04em] text-[#141414] -mt-2">{savingsRate}%</p>
+              <p className="text-[11px] text-[#A8A49E] mt-0.5">of monthly income saved</p>
+            </div>
+
+            <p className="text-[11px] text-[#A8A49E] text-center mt-3 pb-1">
+              Based on this month&apos;s data
+            </p>
+          </div>
+
+          {/* Goals — with progress bars */}
+          {goalsForClient.length > 0 && (
+            <div className="bg-white rounded-2xl border border-[#E6E4DF] p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[13px] font-semibold text-[#141414]">Goals</p>
+                <Link href="/goals" className="text-[11px] text-[#A8A49E] hover:text-[#141414] transition-colors">
+                  View all →
+                </Link>
+              </div>
+              <div className="space-y-4">
+                {activeGoals.map((g) => {
+                  const pct = Math.min((g.currentAmount / g.targetAmount) * 100, 100);
+                  const daysLeft = g.deadline
+                    ? Math.floor((new Date(g.deadline).getTime() - Date.now()) / 86_400_000)
+                    : null;
+                  const urgent = daysLeft !== null && daysLeft <= 7 && daysLeft >= 0;
+
+                  return (
+                    <div key={g.id}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: g.category.color }}
+                          />
+                          <span className="text-[12px] font-medium text-[#141414] truncate">{g.name}</span>
+                        </div>
+                        <span className="text-[10px] text-[#A8A49E] tabular-nums ml-2 flex-shrink-0">
+                          {pct.toFixed(0)}%
+                        </span>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="h-1.5 bg-[#F4F3F0] rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${pct}%`,
+                            backgroundColor:
+                              pct >= 100 ? "#16A34A" :
+                              urgent       ? "#D97706" :
+                              g.category.color,
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-[10px] text-[#A8A49E]">
+                          {formatCurrency(g.currentAmount, currency)} / {formatCurrency(g.targetAmount, currency)}
+                        </p>
+                        {daysLeft !== null && daysLeft >= 0 && (
+                          <p className={`text-[10px] font-medium ${urgent ? "text-[#D97706]" : "text-[#A8A49E]"}`}>
+                            {daysLeft === 0 ? "Due today" : `${daysLeft}d left`}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <span className={`text-sm font-semibold flex-shrink-0 ml-3 ${t.type === "INCOME" ? "text-green-600" : "text-red-600"}`}>
-                      {t.type === "INCOME" ? "+" : "-"}{formatCurrency(t.amount, currency)}
-                    </span>
-                  </li>
+                  );
+                })}
+
+                {completedGoals.slice(0, 1).map((g) => (
+                  <div key={g.id} className="flex items-center gap-2">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#16A34A] flex-shrink-0" />
+                    <span className="text-[11px] text-[#A8A49E] line-through truncate">{g.name}</span>
+                  </div>
                 ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+              </div>
+            </div>
+          )}
+
+          {/* Recent Transactions */}
+          <div className="bg-white rounded-2xl border border-[#E6E4DF] p-5">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[13px] font-semibold text-[#141414]">Recent</p>
+              <Link href="/transactions" className="text-[11px] text-[#A8A49E] hover:text-[#141414] transition-colors">
+                View all →
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {recentTxForClient.slice(0, 6).map((t) => (
+                <div key={t.id} className="flex items-center gap-2.5">
+                  <span
+                    className="w-7 h-7 rounded-xl flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                    style={{ backgroundColor: t.category.color }}
+                  >
+                    {t.category.name[0]}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-medium text-[#141414] truncate">
+                      {t.description || t.category.name}
+                    </p>
+                    <p className="text-[10px] text-[#A8A49E]">
+                      {new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </p>
+                  </div>
+                  <span className={`text-[12px] font-semibold tabular-nums flex-shrink-0 ${t.type === "INCOME" ? "text-[#16A34A]" : "text-[#141414]"}`}>
+                    {t.type === "INCOME" ? "+" : "-"}{formatCurrency(t.amount, currency)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   );
 }
 
-function StatCard({ title, value, icon, accent, bg, valueColor, change, changeLabel, invertChange }: {
-  title: string;
-  value: string;
-  icon: React.ReactNode;
-  accent: string;
-  bg: string;
-  valueColor: string;
-  change?: number | null;
-  changeLabel?: string;
-  invertChange?: boolean;
-}) {
-  const hasChange = change !== null && change !== undefined;
-  // For expenses, going up is bad (red), going down is good (green) — invertChange handles this
-  const changeGood = invertChange ? (change ?? 0) < 0 : (change ?? 0) >= 0;
-
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-0">
-        <div className={`px-5 pt-4 pb-5 bg-gradient-to-br ${bg}`}>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide truncate pr-2">{title}</p>
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: accent + "20", color: accent }}
-            >
-              {icon}
-            </div>
-          </div>
-          <p className={`text-2xl font-bold tracking-tight leading-none ${valueColor}`} title={value}>
-            {value}
-          </p>
-          {hasChange && (
-            <p className={`text-xs mt-2 font-medium ${changeGood ? "text-green-600" : "text-red-500"}`}>
-              {changeGood ? "▲" : "▼"} {Math.abs(change!).toFixed(1)}% {changeLabel}
-            </p>
-          )}
-          {!hasChange && <p className="text-xs mt-2 text-gray-400">All time</p>}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-async function getSixMonthsData(userId: string) {
+async function getSixMonths(userId: string) {
   const results = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date();
     d.setMonth(d.getMonth() - i);
     const start = new Date(d.getFullYear(), d.getMonth(), 1);
-    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+    const end   = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
     const [inc, exp] = await Promise.all([
-      prisma.transaction.aggregate({ where: { userId, type: "INCOME", date: { gte: start, lte: end } }, _sum: { amount: true } }),
+      prisma.transaction.aggregate({ where: { userId, type: "INCOME",  date: { gte: start, lte: end } }, _sum: { amount: true } }),
       prisma.transaction.aggregate({ where: { userId, type: "EXPENSE", date: { gte: start, lte: end } }, _sum: { amount: true } }),
     ]);
     results.push({
-      month: start.toLocaleString("en-US", { month: "short" }),
-      income: inc._sum.amount ?? 0,
+      month:   start.toLocaleString("en-US", { month: "short" }),
+      income:  inc._sum.amount ?? 0,
       expense: exp._sum.amount ?? 0,
     });
   }

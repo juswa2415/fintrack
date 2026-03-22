@@ -7,17 +7,17 @@ import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, ArrowLeftRight, Repeat, PieChart,
-  Target, FileText, Settings, LogOut, TrendingUp,
-  User, Tag, X, Menu,
+  Target, FileText, Tag, User, LogOut, TrendingUp,
+  X, Menu,
 } from "lucide-react";
 
 const navItems = [
-  { href: "/dashboard",     label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/transactions",  label: "Transactions", icon: ArrowLeftRight },
-  { href: "/recurring",     label: "Recurring",    icon: Repeat },
-  { href: "/budget",        label: "Budget",       icon: PieChart },
-  { href: "/goals",         label: "Goals",        icon: Target },
-  { href: "/reports",       label: "Reports",      icon: FileText },
+  { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
+  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
+  { href: "/recurring",    label: "Recurring",    icon: Repeat },
+  { href: "/budget",       label: "Budget",       icon: PieChart },
+  { href: "/goals",        label: "Goals",        icon: Target },
+  { href: "/reports",      label: "Reports",      icon: FileText },
 ];
 
 const settingsItems = [
@@ -32,53 +32,44 @@ interface SidebarProps {
   userImage?: string | null;
 }
 
-function SidebarContent({
-  onClose, userName, userImage,
-}: {
+function SidebarContent({ onClose, userName, userImage }: {
   onClose: () => void;
   userName?: string;
   userImage?: string | null;
 }) {
   const pathname = usePathname();
-
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(href + "/");
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   return (
     <div
-      className="flex flex-col h-full text-white"
+      className="flex flex-col h-full"
       style={{
-        background: "linear-gradient(180deg, #0f1117 0%, #141720 100%)",
-        borderRight: "1px solid rgba(255,255,255,0.06)",
+        background: "var(--sidebar-bg)",
+        borderRight: "none",
       }}
     >
       {/* Logo */}
-      <div className="flex items-center justify-between px-5 py-5">
+      <div
+        className="flex items-center justify-between px-5 h-14 flex-shrink-0"
+        style={{ borderBottom: "1px solid var(--sidebar-border)" }}
+      >
         <div className="flex items-center gap-2.5">
-          <div
-            className="flex items-center justify-center w-8 h-8 rounded-xl flex-shrink-0"
-            style={{
-              background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-              boxShadow: "0 4px 12px rgba(99,102,241,0.4)",
-            }}
-          >
-            <TrendingUp className="h-4 w-4 text-white" />
+          <div className="w-7 h-7 rounded-lg bg-[#141414] flex items-center justify-center flex-shrink-0">
+            <TrendingUp className="h-3.5 w-3.5 text-white" />
           </div>
-          <span className="text-[15px] font-bold tracking-tight text-white">FinTrack</span>
+          <span className="text-[14px] font-semibold text-[#141414] tracking-[-0.02em]">FinTrack</span>
         </div>
         <button
           onClick={onClose}
-          className="lg:hidden p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-colors"
+          className="lg:hidden p-1.5 rounded-lg transition-colors"
+          style={{ color: "var(--text-muted)" }}
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-2 overflow-y-auto space-y-0.5">
-        <p className="px-3 pt-1 pb-2 text-[10px] font-semibold text-gray-600 uppercase tracking-widest">
-          Main
-        </p>
+      {/* Navigation */}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = isActive(href);
           return (
@@ -87,34 +78,31 @@ function SidebarContent({
               href={href}
               onClick={onClose}
               className={cn(
-                "relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150",
-                active
-                  ? "text-white"
-                  : "text-gray-500 hover:text-gray-200 hover:bg-white/5"
+                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-150",
+                !active && "hover:shadow-[0_1px_4px_0_rgba(0,0,0,0.10)] hover:bg-white/60"
               )}
-              style={active ? {
-                background: "linear-gradient(90deg, rgba(99,102,241,0.2) 0%, rgba(99,102,241,0.08) 100%)",
-              } : {}}
+              style={{
+                background: active ? "var(--sidebar-active)" : undefined,
+                color: active ? "var(--sidebar-active-text)" : "var(--sidebar-text)",
+                boxShadow: active ? "0 1px 4px 0 rgba(0,0,0,0.10)" : undefined,
+              }}
             >
-              {/* Left accent bar */}
-              {active && (
-                <span
-                  className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
-                  style={{ background: "linear-gradient(180deg, #818cf8, #6366f1)" }}
-                />
-              )}
               <Icon
                 className="h-4 w-4 flex-shrink-0"
-                style={{ color: active ? "#818cf8" : undefined }}
+                style={{ color: active ? "var(--sidebar-active-text)" : "var(--text-muted)" }}
               />
               {label}
             </Link>
           );
         })}
 
-        <p className="px-3 pt-4 pb-2 text-[10px] font-semibold text-gray-600 uppercase tracking-widest">
-          Settings
-        </p>
+        {/* Settings divider */}
+        <div className="pt-4 pb-2">
+          <p className="px-3 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>
+            Settings
+          </p>
+        </div>
+
         {settingsItems.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (
@@ -123,24 +111,18 @@ function SidebarContent({
               href={href}
               onClick={onClose}
               className={cn(
-                "relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150",
-                active
-                  ? "text-white"
-                  : "text-gray-500 hover:text-gray-200 hover:bg-white/5"
+                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-150",
+                !active && "hover:shadow-[0_1px_4px_0_rgba(0,0,0,0.10)] hover:bg-white/60"
               )}
-              style={active ? {
-                background: "linear-gradient(90deg, rgba(99,102,241,0.2) 0%, rgba(99,102,241,0.08) 100%)",
-              } : {}}
+              style={{
+                background: active ? "var(--sidebar-active)" : undefined,
+                color: active ? "var(--sidebar-active-text)" : "var(--sidebar-text)",
+                boxShadow: active ? "0 1px 4px 0 rgba(0,0,0,0.10)" : undefined,
+              }}
             >
-              {active && (
-                <span
-                  className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
-                  style={{ background: "linear-gradient(180deg, #818cf8, #6366f1)" }}
-                />
-              )}
               <Icon
                 className="h-4 w-4 flex-shrink-0"
-                style={{ color: active ? "#818cf8" : undefined }}
+                style={{ color: active ? "var(--sidebar-active-text)" : "var(--text-muted)" }}
               />
               {label}
             </Link>
@@ -148,31 +130,37 @@ function SidebarContent({
         })}
       </nav>
 
-      {/* User card + sign out */}
-      <div className="px-3 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1"
-          style={{ background: "rgba(255,255,255,0.04)" }}>
-          <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 bg-indigo-800 flex items-center justify-center">
+      {/* User card */}
+      <div
+        className="px-3 pb-4 flex-shrink-0"
+        style={{ borderTop: "1px solid var(--sidebar-border)" }}
+      >
+        <div className="flex items-center gap-3 px-3 py-3 rounded-xl mt-3">
+          <div
+            className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center"
+            style={{ background: "var(--border)" }}
+          >
             {userImage ? (
               <img src={userImage} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
-              <span className="text-xs font-bold text-indigo-200">
+              <span className="text-[12px] font-semibold" style={{ color: "var(--text-secondary)" }}>
                 {userName?.[0]?.toUpperCase() ?? "U"}
               </span>
             )}
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[12px] font-medium text-gray-200 truncate">{userName}</p>
-            <p className="text-[10px] text-gray-600 truncate">Personal account</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-[12px] font-medium text-[#141414] truncate">{userName}</p>
+            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Personal</p>
           </div>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="p-1.5 rounded-lg transition-colors flex-shrink-0"
+            style={{ color: "var(--text-muted)" }}
+            title="Sign out"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
         </div>
-        <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
-          className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-[13px] font-medium text-gray-600 hover:text-gray-300 hover:bg-white/5 transition-colors"
-        >
-          <LogOut className="h-3.5 w-3.5" />
-          Sign out
-        </button>
       </div>
     </div>
   );
@@ -184,18 +172,24 @@ export function Sidebar({ open, onClose, userName, userImage }: SidebarProps) {
 
   return (
     <>
-      <aside className="hidden lg:flex lg:flex-col fixed left-0 top-0 h-full w-60 z-40">
+      {/* Desktop: fixed, always visible */}
+      <aside className="hidden lg:flex lg:flex-col fixed left-0 top-0 h-full w-56 z-40">
         <SidebarContent onClose={onClose} userName={userName} userImage={userImage} />
       </aside>
 
+      {/* Mobile: overlay */}
       {open && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden" onClick={onClose} />
+        <div
+          className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+          onClick={onClose}
+        />
       )}
-
-      <aside className={cn(
-        "fixed left-0 top-0 h-full w-72 z-50 lg:hidden transition-transform duration-300 ease-in-out",
-        open ? "translate-x-0" : "-translate-x-full"
-      )}>
+      <aside
+        className={cn(
+          "fixed left-0 top-0 h-full w-64 z-50 lg:hidden transition-transform duration-300 ease-in-out",
+          open ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
         <SidebarContent onClose={onClose} userName={userName} userImage={userImage} />
       </aside>
     </>
@@ -206,9 +200,10 @@ export function MenuButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="lg:hidden p-2 rounded-xl text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+      className="lg:hidden p-2 rounded-xl transition-colors"
+      style={{ color: "var(--text-muted)" }}
     >
-      <Menu className="h-5 w-5" />
+      <Menu className="h-4 w-4" />
     </button>
   );
 }
